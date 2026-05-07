@@ -233,10 +233,36 @@
   footer { text-align: center; padding: 32px; font-family: 'Caveat', cursive; font-size: 16px; color: #aaa; border-top: 1px solid var(--line-blue); }
 
   @media (max-width: 700px) {
-    .page-wrap { padding: 0 20px 0 40px; }
+    .page-wrap { padding: 0 16px 0 32px; }
     .cards-grid, .stats-grid { grid-template-columns: 1fr; }
     .steps { grid-template-columns: repeat(2,1fr); }
     .steps::before { display: none; }
+    .hole-punch { left: 6px; width: 18px; height: 18px; }
+    nav ul { gap: 12px; }
+    nav a { font-size: 15px; }
+    .cta-row { flex-direction: column; align-items: center; }
+    .btn-stamp, .btn-outline { width: 100%; max-width: 280px; text-align: center; }
+    .section-title { font-size: clamp(24px, 6vw, 38px); }
+    .lb-name { font-size: 15px; }
+  }
+
+  @media (max-width: 480px) {
+    .page-wrap { padding: 0 12px 0 24px; }
+    .hole-punch { display: none; }
+    .npat-letters { gap: 8px; font-size: clamp(60px, 14vw, 100px); }
+    .npat-dot { font-size: 0.3em; }
+    .hero-full-name { font-size: clamp(11px, 2.8vw, 16px); letter-spacing: 4px; }
+    .hero-tagline { font-size: 16px; }
+    nav { flex-wrap: wrap; gap: 10px; }
+    nav ul { flex-wrap: wrap; justify-content: center; gap: 10px; }
+    .steps { grid-template-columns: 1fr; }
+    .lb-item { flex-wrap: wrap; gap: 6px; }
+    .stats-grid { grid-template-columns: repeat(3,1fr); gap: 16px; }
+    .stat-num { font-size: 44px; }
+    .stat-label { font-size: 14px; }
+    .corkboard { padding: 20px 16px; }
+    .final-title { font-size: clamp(36px, 8vw, 56px); }
+    .cards-grid { gap: 20px; }
   }
 </style>
 </head>
