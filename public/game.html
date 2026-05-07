@@ -236,12 +236,16 @@
   .sc-tbl tbody td:first-child { font-family:'Caveat',cursive; font-size:15px; font-weight:700; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .sc-tbl tbody td:last-child { text-align:right; font-family:'Bangers',cursive; font-size:18px; color:var(--r); white-space:nowrap; }
 
-  .pt { display:inline-block; font-family:'Bangers',cursive; font-size:11px; padding:1px 4px; margin-left:2px; vertical-align:middle; }
-  .pt-u { background:var(--y); color:var(--ink); }
-  .pt-s { background:#eee; color:#666; }
-  .pt-x { background:#ffe0e0; color:var(--r); }
+  .pt { display:inline-block; font-family:'Bangers',cursive; font-size:11px; padding:1px 4px; margin-left:2px; vertical-align:middle; border-radius:3px; }
+  .pt-u   { background:var(--y); color:var(--ink); }
+  .pt-s7  { background:#c0e8ff; color:#005a8c; }
+  .pt-s5  { background:#eee; color:#666; }
+  .pt-s3  { background:#ddd; color:#999; }
+  .pt-x   { background:#ffe0e0; color:var(--r); }
   .pt-spd { background:var(--b); color:white; }
-  .pt-time { background:var(--o); color:white; }
+  .pt-len { background:#d4f7d4; color:#276227; }
+  .pt-fh  { background:#f0e0ff; color:#7a2d9a; }
+  .pt-lr  { background:var(--o); color:white; }
   .invalid-ans { color:#aaa; text-decoration:line-through; font-style:italic; }
   .invalid-note { display:block; font-family:'Caveat',cursive; font-size:11px; color:var(--r); font-style:normal; }
 
@@ -817,12 +821,20 @@ function renderScoring({ scores, leaderboard, round, maxRounds, isLastRound }) {
       const b = r.breakdown[f];
       if (!b?.answer) return `<td style="color:#ccc">—</td>`;
       if (b.reason === 'invalid') return `<td><span class="invalid-ans">${b.answer}</span><span class="pt pt-x">✗</span><span class="invalid-note">${b.note||'invalid'}</span></td>`;
-      const badge = b.reason==='unique' ? `<span class="pt pt-u">+10</span>` : `<span class="pt pt-s">+5</span>`;
-      return `<td>${b.answer}${badge}</td>`;
+      const ptMap = { 'unique':'pt-u', 'shared-1':'pt-s7', 'shared-2':'pt-s5', 'shared-3+':'pt-s3' };
+      const ptVal = { 'unique':'+10', 'shared-1':'+7', 'shared-2':'+5', 'shared-3+':'+3' };
+      const badge = ptMap[b.reason] ? `<span class="pt ${ptMap[b.reason]}">${ptVal[b.reason]}</span>` : '';
+      const lenBadge = b.lenBonus ? `<span class="pt pt-len">+${b.lenBonus}L</span>` : '';
+      return `<td>${b.answer}${badge}${lenBadge}</td>`;
     }
     let bonuses = '';
-    if (r.breakdown._speedBonus) bonuses += `<span class="pt pt-spd">⚡${r.breakdown._speedRank}st +${r.breakdown._speedBonus}</span>`;
-    if (r.breakdown._timeBonus)  bonuses += `<span class="pt pt-time">⏱+${r.breakdown._timeBonus}</span>`;
+    if (r.breakdown._speedBonus) {
+      const rk = r.breakdown._speedRank;
+      const sfx = rk===1?'st':rk===2?'nd':rk===3?'rd':'th';
+      bonuses += `<span class="pt pt-spd">⚡${rk}${sfx} +${r.breakdown._speedBonus}</span>`;
+    }
+    if (r.breakdown._fullHouse)      bonuses += `<span class="pt pt-fh">🏠+${r.breakdown._fullHouse}</span>`;
+    if (r.breakdown._lastRoundBonus) bonuses += `<span class="pt pt-lr">×1.5 +${r.breakdown._lastRoundBonus}</span>`;
     return `<tr style="${me?'outline:2px solid var(--b);':''}">
       <td>${me?'<strong>':''}${r.name}${me?'</strong>':''}</td>
       ${cell('name')}${cell('place')}${cell('animal')}${cell('thing')}

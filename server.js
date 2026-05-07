@@ -12,11 +12,28 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // ─── Config ──────────────────────────────────────────────────
-const LETTERS       = 'BCDFGHJKLMNPRST'.split('');
-const ROUND_TIME    = 45;
+const LETTERS        = 'BCDFGHJKLMNPRST'.split('');
+const ROUND_TIME     = 45;
 const DEFAULT_ROUNDS = 5;
-const AUTO_ADVANCE  = 30;          // seconds before auto-next-round
-const SPEED_BONUS   = [10, 6, 4, 2, 1]; // by submission order (1st→5th+)
+const AUTO_ADVANCE   = 30;
+
+// Speed bonus — only awarded when player filled 3+ valid answers
+const SPEED_BONUS = [8, 5, 3, 1]; // 1st, 2nd, 3rd, 4th+ (index 3 used for all beyond)
+
+// Shared-answer tiers: score based on how many others wrote the same word
+// key = number of players with that answer, value = points awarded
+function sharedPoints(count) {
+  if (count === 1) return 10; // unique
+  if (count === 2) return 7;  // 1 other
+  if (count === 3) return 5;  // 2 others
+  return 3;                   // 3+ others
+}
+
+const LONG_WORD_BONUS     = 1; // answer is 8–10 chars
+const VERY_LONG_WORD_BONUS = 2; // answer is 11+ chars
+const FULL_HOUSE_BONUS    = 5;  // all 4 categories filled and valid
+const INVALID_PENALTY     = -2; // submitting a clearly invalid answer
+const LAST_ROUND_MULT     = 1.5; // final round multiplier
 
 const rooms = new Map();
 
@@ -85,16 +102,17 @@ function validateAnswer(answer, letter) {
 
 // ─── Scoring ─────────────────────────────────────────────────
 function scoreRound(room) {
-  const fields = ['name', 'place', 'animal', 'thing'];
+  const fields    = ['name', 'place', 'animal', 'thing'];
+  const isLastRnd = room.round >= room.maxRounds;
 
-  // Validate each answer
+  // 1. Validate every submitted answer
   const valid = {};
   room.submissions.forEach((sub, pid) => {
     valid[pid] = {};
     fields.forEach(f => { valid[pid][f] = validateAnswer(sub[f], room.letter); });
   });
 
-  // Frequency map — only valid answers count
+  // 2. Frequency map — only valid, non-empty answers count toward shared scoring
   const freq = {};
   fields.forEach(f => { freq[f] = {}; });
   room.submissions.forEach((sub, pid) => {
@@ -106,49 +124,84 @@ function scoreRound(room) {
   });
 
   const results = {};
+
   room.players.forEach((player, pid) => {
-    const sub  = room.submissions.get(pid) || {};
+    const sub = room.submissions.get(pid) || {};
     let roundPts = 0;
     const breakdown = {};
+    let validFilledCount = 0;  // how many categories this player filled with valid answers
 
-    // Per-field score
+    // ── Per-field score ──────────────────────────────────────
     fields.forEach(f => {
       const raw = (sub[f] || '').trim();
       const key = raw.toLowerCase();
       const v   = valid[pid]?.[f] || { valid: true };
 
       if (!key) {
+        // Blank — no points, no penalty
         breakdown[f] = { answer: '', points: 0, reason: 'blank' };
+
       } else if (!v.valid) {
-        breakdown[f] = { answer: raw, points: 0, reason: 'invalid', note: v.reason };
-      } else if (freq[f][key] === 1) {
-        breakdown[f] = { answer: raw, points: 10, reason: 'unique' };
-        roundPts += 10;
+        // Invalid — small penalty to discourage gibberish spam
+        breakdown[f] = { answer: raw, points: INVALID_PENALTY, reason: 'invalid', note: v.reason };
+        roundPts += INVALID_PENALTY;
+
       } else {
-        breakdown[f] = { answer: raw, points: 5, reason: 'shared' };
-        roundPts += 5;
+        // Valid answer — score by how many others wrote the same thing
+        const count  = freq[f][key] || 1;
+        const pts    = sharedPoints(count);
+        const reason = count === 1 ? 'unique'
+                     : count === 2 ? 'shared-1'
+                     : count === 3 ? 'shared-2'
+                     : 'shared-3+';
+
+        // Long word bonus (applies on top of answer score)
+        const wordLen  = raw.replace(/[\s\-']/g, '').length;
+        const lenBonus = wordLen >= 11 ? VERY_LONG_WORD_BONUS
+                       : wordLen >= 8  ? LONG_WORD_BONUS
+                       : 0;
+
+        breakdown[f] = { answer: raw, points: pts, reason, lenBonus };
+        roundPts += pts + lenBonus;
+        validFilledCount++;
       }
     });
 
-    // Speed bonus by submission order
-    const rank = room.submissionOrder.indexOf(pid);
-    if (rank >= 0) {
-      const spd = SPEED_BONUS[Math.min(rank, SPEED_BONUS.length - 1)];
-      breakdown._speedBonus = spd;
-      breakdown._speedRank  = rank + 1;
-      roundPts += spd;
+    // ── Full house bonus: all 4 valid and filled ─────────────
+    if (validFilledCount === 4) {
+      breakdown._fullHouse = FULL_HOUSE_BONUS;
+      roundPts += FULL_HOUSE_BONUS;
     }
 
-    // Time bonus — reward submitting early
-    if (sub.submittedAt && room.roundStartTime) {
-      const elapsed  = (sub.submittedAt - room.roundStartTime) / 1000;
-      const timeLeft = ROUND_TIME - elapsed;
-      const timeBonus = timeLeft > 30 ? 3 : timeLeft > 15 ? 2 : timeLeft > 5 ? 1 : 0;
-      if (timeBonus > 0) { breakdown._timeBonus = timeBonus; roundPts += timeBonus; }
+    // ── Speed bonus: only if player filled 3+ valid answers ──
+    if (validFilledCount >= 3) {
+      const rank = room.submissionOrder.indexOf(pid);
+      if (rank >= 0) {
+        const spd = SPEED_BONUS[Math.min(rank, SPEED_BONUS.length - 1)];
+        breakdown._speedBonus = spd;
+        breakdown._speedRank  = rank + 1;
+        roundPts += spd;
+      }
     }
+
+    // ── Last-round multiplier (round to nearest integer) ─────
+    if (isLastRnd && roundPts > 0) {
+      const bonus = Math.round(roundPts * (LAST_ROUND_MULT - 1));
+      breakdown._lastRoundBonus = bonus;
+      roundPts += bonus;
+    }
+
+    // Clamp to 0 minimum (can't go negative on the round)
+    roundPts = Math.max(0, roundPts);
 
     player.score += roundPts;
-    results[pid] = { name: player.name, roundPts, totalScore: player.score, breakdown };
+    results[pid] = {
+      name: player.name,
+      roundPts,
+      totalScore: player.score,
+      breakdown,
+      isLastRound: isLastRnd,
+    };
   });
 
   return results;
