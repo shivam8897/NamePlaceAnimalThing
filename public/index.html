@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>N·P·A·T — Name Place Animal Thing</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Caveat:wght@400;700&family=Special+Elite&family=Bangers&family=Patrick+Hand&display=swap');
+
+  :root {
+    --yellow: #FFE600;
+    --crimson: #E8001D;
+    --cobalt: #1A3AFF;
+    --green: #00C44F;
+    --orange: #FF6B00;
+    --ink: #1a1a2e;
+    --paper: #faf6ee;
+    --paper-aged: #f5edd8;
+    --line-blue: #b8d4f0;
+    --margin-red: #ff8fa0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background-color: var(--paper); font-family: 'Patrick Hand', cursive; overflow-x: hidden; cursor: none; }
+
+  #cursor { position: fixed; width: 32px; height: 32px; pointer-events: none; z-index: 9999; transform: translate(-4px, -28px) rotate(-30deg); }
+  #trail-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9998; opacity: 0.35; }
+
+  .notebook-bg {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+    background-color: var(--paper);
+    background-image:
+      repeating-linear-gradient(transparent, transparent 31px, var(--line-blue) 31px, var(--line-blue) 32px),
+      linear-gradient(to right, transparent 68px, var(--margin-red) 68px, var(--margin-red) 70px, transparent 70px);
+    background-size: 100% 32px, 100% 100%;
+    background-position: 0 40px, 0 0;
+  }
+
+  .hole-punch {
+    position: fixed; left: 28px; width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle, #e0d8c8 60%, #c8bfa8 100%);
+    border: 2px solid #c0b490;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 1px 2px rgba(255,255,255,0.6);
+    z-index: 1;
+  }
+
+  .page-wrap { max-width: 1100px; margin: 0 auto; padding: 0 90px 0 100px; position: relative; }
+
+  /* NAV */
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 24px 0 0; }
+  .nav-logo { font-family: 'Bangers', cursive; font-size: 26px; color: var(--cobalt); letter-spacing: 3px; text-shadow: 2px 2px 0 var(--crimson); }
+  nav ul { display: flex; gap: 24px; list-style: none; }
+  nav a { font-family: 'Caveat', cursive; font-size: 18px; font-weight: 700; color: var(--ink); text-decoration: underline wavy var(--cobalt); text-underline-offset: 4px; cursor: none; }
+
+  /* HERO */
+  .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 0 60px; text-align: center; position: relative; }
+
+  .hero-eyebrow { font-family: 'Caveat', cursive; font-size: 20px; color: var(--crimson); font-weight: 700; letter-spacing: 3px; margin-bottom: 12px; transform: rotate(-1.5deg); display: block; }
+
+  /* Main title — stacked NPAT letters */
+  .hero-title-block { position: relative; display: inline-block; margin-bottom: 8px; }
+
+  .npat-letters {
+    display: flex; gap: 16px; align-items: flex-end; justify-content: center;
+    font-family: 'Bangers', cursive;
+    font-size: clamp(80px, 15vw, 150px);
+    line-height: 0.9;
+    letter-spacing: 4px;
+    transform: rotate(-2deg);
+  }
+
+  .npat-n { color: var(--crimson); text-shadow: 5px 5px 0 rgba(232,0,29,0.2), 3px 3px 0 #8b0000; filter: url(#ink-bleed); }
+  .npat-p { color: var(--cobalt); text-shadow: 5px 5px 0 rgba(26,58,255,0.2), 3px 3px 0 #000a8b; filter: url(#ink-bleed); }
+  .npat-a { color: var(--green); text-shadow: 5px 5px 0 rgba(0,196,79,0.2), 3px 3px 0 #007a30; filter: url(#ink-bleed); }
+  .npat-t { color: var(--orange); text-shadow: 5px 5px 0 rgba(255,107,0,0.2), 3px 3px 0 #c04400; filter: url(#ink-bleed); }
+
+  .npat-dot { color: var(--ink); font-size: 0.4em; opacity: 0.3; align-self: center; margin-bottom: 12px; }
+
+  .hero-full-name {
+    font-family: 'Special Elite', cursive; font-size: clamp(14px, 2.2vw, 22px);
+    color: #888; letter-spacing: 6px; text-transform: uppercase;
+    margin-top: 4px; display: block;
+  }
+
+  .ink-underline { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 105%; }
+  .ink-underline path { stroke-dasharray: 700; stroke-dashoffset: 700; animation: draw-ink 1.8s ease forwards 0.4s; }
+  @keyframes draw-ink { to { stroke-dashoffset: 0; } }
+
+  .hero-tagline { font-family: 'Special Elite', cursive; font-size: 20px; color: var(--ink); margin: 24px 0 36px; opacity: 0.7; }
+  .typing-text { border-right: 3px solid var(--cobalt); animation: blink 0.7s step-end infinite; }
+  @keyframes blink { 50% { border-color: transparent; } }
+
+  /* CTA */
+  .cta-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+
+  .btn-stamp {
+    position: relative; font-family: 'Bangers', cursive; font-size: 30px; letter-spacing: 6px;
+    color: white; background: var(--crimson); border: none; padding: 16px 48px; cursor: none;
+    box-shadow: 0 8px 0 #8b0000, 0 12px 20px rgba(232,0,29,0.4);
+    clip-path: polygon(2% 0%, 98% 0%, 100% 15%, 100% 85%, 98% 100%, 2% 100%, 0% 85%, 0% 15%);
+    transition: transform 0.1s, box-shadow 0.1s; overflow: hidden; text-decoration: none; display: inline-block;
+  }
+  .btn-stamp::before { content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); transition: left 0.4s; }
+  .btn-stamp:hover::before { left: 150%; }
+  .btn-stamp.slam { animation: stamp-slam 0.3s cubic-bezier(0.36,0.07,0.19,0.97); }
+  @keyframes stamp-slam {
+    0% { transform: scale(1.1) translateY(-12px); box-shadow: 0 20px 0 #8b0000, 0 24px 30px rgba(232,0,29,0.5); }
+    60% { transform: scale(0.96) translateY(6px); box-shadow: 0 2px 0 #8b0000, 0 4px 10px rgba(232,0,29,0.6); }
+    80% { transform: scale(1.02) translateY(-2px); }
+    100% { transform: scale(1) translateY(0); box-shadow: 0 8px 0 #8b0000, 0 12px 20px rgba(232,0,29,0.4); }
+  }
+
+  .btn-outline {
+    font-family: 'Caveat', cursive; font-size: 20px; font-weight: 700; color: var(--cobalt);
+    background: transparent; border: 3px solid var(--cobalt); padding: 14px 32px; cursor: none;
+    text-decoration: none; display: inline-block; transform: rotate(1deg);
+    transition: background 0.2s, color 0.2s, transform 0.2s;
+  }
+  .btn-outline:hover { background: var(--cobalt); color: white; transform: rotate(-1deg) scale(1.04); }
+
+  /* STICKERS & DECO */
+  .star-sticker { position: absolute; font-size: 36px; filter: drop-shadow(2px 3px 4px rgba(0,0,0,0.25)); animation: wiggle 3s ease-in-out infinite; pointer-events: none; }
+  @keyframes wiggle { 0%,100% { transform: rotate(-5deg) scale(1); } 50% { transform: rotate(5deg) scale(1.08); } }
+
+  .tape { position: absolute; width: 52px; height: 20px; background: rgba(255,230,0,0.55); border: 1px solid rgba(200,180,0,0.3); border-radius: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+  .paper-plane { position: absolute; font-size: 40px; animation: fly-plane 9s ease-in-out infinite; pointer-events: none; }
+  @keyframes fly-plane {
+    0% { transform: translate(-80px,20px) rotate(-15deg) scale(0.8); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translate(110vw,30px) rotate(10deg) scale(0.9); opacity: 0; }
+  }
+
+  .doodle { position: absolute; opacity: 0.25; pointer-events: none; animation: float-doodle 4s ease-in-out infinite; font-size: 30px; }
+  @keyframes float-doodle { 0%,100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-10px) rotate(5deg); } }
+
+  /* CATEGORIES */
+  .categories { padding: 60px 0 80px; }
+  .section-label { font-family: 'Caveat', cursive; font-size: 18px; color: var(--cobalt); font-weight: 700; letter-spacing: 3px; text-transform: uppercase; text-align: center; margin-bottom: 8px; opacity: 0.6; }
+  .section-title { font-family: 'Permanent Marker', cursive; font-size: 38px; color: var(--ink); text-align: center; margin-bottom: 48px; transform: rotate(-1deg); display: inline-block; width: 100%; }
+  .highlight { background: var(--yellow); padding: 0 8px; display: inline-block; transform: rotate(0.5deg); }
+
+  .cards-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 32px; max-width: 780px; margin: 0 auto; }
+
+  .card { position: relative; background: white; padding: 32px 28px 36px; transition: transform 0.3s, box-shadow 0.3s; cursor: none; }
+  .card::before { content: ''; position: absolute; top: -18px; left: 0; right: 0; height: 22px; background: white; clip-path: polygon(0% 100%, 3% 40%, 6% 80%, 9% 20%, 12% 60%, 15% 10%, 18% 50%, 21% 0%, 24% 40%, 27% 80%, 30% 20%, 33% 70%, 36% 15%, 39% 55%, 42% 5%, 45% 45%, 48% 85%, 51% 25%, 54% 65%, 57% 10%, 60% 50%, 63% 90%, 66% 30%, 69% 70%, 72% 15%, 75% 55%, 78% 0%, 81% 40%, 84% 80%, 87% 20%, 90% 60%, 93% 10%, 96% 50%, 100% 20%, 100% 100%); }
+  .card::after { content: ''; position: absolute; bottom: -18px; left: 0; right: 0; height: 22px; background: white; clip-path: polygon(0% 0%, 4% 60%, 8% 20%, 12% 80%, 16% 30%, 20% 90%, 24% 45%, 28% 10%, 32% 70%, 36% 25%, 40% 85%, 44% 35%, 48% 95%, 52% 50%, 56% 5%, 60% 65%, 64% 20%, 68% 80%, 72% 35%, 76% 90%, 80% 40%, 84% 100%, 88% 55%, 92% 15%, 96% 75%, 100% 30%, 100% 0%); }
+  .card:hover { transform: translateY(-8px) rotate(0.5deg) !important; box-shadow: 0 20px 50px rgba(0,0,0,0.15); }
+
+  .pushpin { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); z-index: 10; filter: drop-shadow(3px 5px 6px rgba(0,0,0,0.35)); }
+  .pushpin-head { width: 24px; height: 24px; border-radius: 50%; margin: 0 auto 2px; box-shadow: inset -3px -3px 6px rgba(0,0,0,0.3), inset 2px 2px 4px rgba(255,255,255,0.4); }
+  .pushpin-stick { width: 4px; height: 14px; background: linear-gradient(180deg,#c0c0c0,#808080); margin: 0 auto; border-radius: 0 0 2px 2px; }
+
+  .card-name { border-top: 3px solid var(--crimson); transform: rotate(-1.5deg); box-shadow: -4px 6px 0 rgba(232,0,29,0.1), 4px 6px 20px rgba(232,0,29,0.08); }
+  .card-place { border-top: 3px solid var(--cobalt); transform: rotate(1deg); box-shadow: -4px 6px 0 rgba(26,58,255,0.1), 4px 6px 20px rgba(26,58,255,0.08); }
+  .card-animal { border-top: 3px solid var(--green); transform: rotate(0.5deg); box-shadow: -4px 6px 0 rgba(0,196,79,0.1), 4px 6px 20px rgba(0,196,79,0.08); }
+  .card-thing { border-top: 3px solid var(--orange); transform: rotate(-0.8deg); box-shadow: -4px 6px 0 rgba(255,230,0,0.2), 4px 6px 20px rgba(255,107,0,0.1); }
+  .card-name .pushpin-head { background: radial-gradient(circle at 35% 35%, #ff6b6b, var(--crimson)); }
+  .card-place .pushpin-head { background: radial-gradient(circle at 35% 35%, #6bcbff, var(--cobalt)); }
+  .card-animal .pushpin-head { background: radial-gradient(circle at 35% 35%, #6bffb0, var(--green)); }
+  .card-thing .pushpin-head { background: radial-gradient(circle at 35% 35%, #ffec6b, #e0a000); }
+
+  .card-letter { position: absolute; top: 12px; right: 18px; font-family: 'Bangers', cursive; font-size: 70px; line-height: 1; pointer-events: none; opacity: 0.1; }
+  .card-name .card-letter { color: var(--crimson); }
+  .card-place .card-letter { color: var(--cobalt); }
+  .card-animal .card-letter { color: var(--green); }
+  .card-thing .card-letter { color: var(--orange); }
+
+  .card-icon { font-size: 50px; display: block; text-align: center; margin-bottom: 10px; transition: transform 0.3s; }
+  .card:hover .card-icon { transform: scale(1.15) rotate(-5deg); }
+  .card-title { font-family: 'Permanent Marker', cursive; font-size: 28px; text-align: center; margin-bottom: 8px; }
+  .card-name .card-title { color: var(--crimson); }
+  .card-place .card-title { color: var(--cobalt); }
+  .card-animal .card-title { color: var(--green); }
+  .card-thing .card-title { color: var(--orange); }
+  .card-desc { font-family: 'Caveat', cursive; font-size: 16px; color: #555; text-align: center; line-height: 1.4; }
+  .card-tags { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .tag { font-family: 'Special Elite', cursive; font-size: 12px; padding: 3px 8px; border-radius: 2px; font-weight: bold; letter-spacing: 1px; }
+  .card-name .tag { background: #ffe0e0; color: var(--crimson); }
+  .card-place .tag { background: #e0e8ff; color: var(--cobalt); }
+  .card-animal .tag { background: #e0ffe8; color: #007a30; }
+  .card-thing .tag { background: #fff8e0; color: #c07000; }
+
+  /* HOW TO PLAY */
+  .how-to { padding: 60px 0 80px; }
+  .steps { display: grid; grid-template-columns: repeat(4,1fr); gap: 24px; position: relative; margin-top: 40px; }
+  .steps::before { content: ''; position: absolute; top: 36px; left: 10%; width: 80%; height: 4px; background: repeating-linear-gradient(90deg, var(--cobalt) 0, var(--cobalt) 10px, transparent 10px, transparent 20px); }
+  .step { text-align: center; position: relative; z-index: 1; }
+  .step-num { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Bangers', cursive; font-size: 32px; color: white; margin: 0 auto 16px; box-shadow: 0 6px 0 rgba(0,0,0,0.2); border: 3px solid rgba(255,255,255,0.3); }
+  .step:nth-child(1) .step-num { background: var(--crimson); }
+  .step:nth-child(2) .step-num { background: var(--cobalt); }
+  .step:nth-child(3) .step-num { background: var(--green); }
+  .step:nth-child(4) .step-num { background: var(--orange); }
+  .step-title { font-family: 'Permanent Marker', cursive; font-size: 18px; color: var(--ink); margin-bottom: 6px; }
+  .step-desc { font-family: 'Caveat', cursive; font-size: 15px; color: #555; line-height: 1.4; }
+
+  /* LEADERBOARD */
+  .lb-section { padding: 60px 0 80px; }
+  .corkboard { background: #c9a96e; padding: 32px; max-width: 680px; margin: 40px auto 0; position: relative; box-shadow: inset 0 0 20px rgba(0,0,0,0.2), 0 12px 40px rgba(0,0,0,0.3); border-radius: 4px; transform: rotate(0.5deg); }
+  .corkboard::before { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4'/%3E%3CfeColorMatrix type='matrix' values='0.6 0 0 0 0.5 0 0.4 0 0 0.3 0 0 0.3 0 0.2 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)'/%3E%3C/svg%3E"); opacity: 0.5; border-radius: 4px; }
+  .corkboard-title { font-family: 'Permanent Marker', cursive; font-size: 26px; color: var(--paper); text-align: center; margin-bottom: 24px; position: relative; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+  .lb-list { list-style: none; display: flex; flex-direction: column; gap: 10px; position: relative; }
+  .lb-item { background: var(--paper); display: flex; align-items: center; padding: 12px 20px; gap: 16px; box-shadow: 2px 4px 8px rgba(0,0,0,0.2); transform: rotate(var(--r,0deg)); transition: transform 0.2s; }
+  .lb-item:hover { transform: rotate(0deg) scale(1.02); }
+  .lb-rank { font-family: 'Bangers', cursive; font-size: 28px; width: 36px; text-align: center; color: var(--ink); }
+  .lb-rank.gold { color: #FFB800; }
+  .lb-rank.silver { color: #999; }
+  .lb-rank.bronze { color: #cd7f32; }
+  .lb-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+  .lb-name { font-family: 'Special Elite', cursive; font-size: 18px; color: var(--ink); flex: 1; }
+  .lb-score { font-family: 'Bangers', cursive; font-size: 24px; color: var(--crimson); }
+
+  /* STATS */
+  .stats { padding: 40px 0 60px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 32px; max-width: 700px; margin: 32px auto 0; text-align: center; }
+  .stat-num { font-family: 'Bangers', cursive; font-size: 64px; line-height: 1; display: block; }
+  .stat-label { font-family: 'Caveat', cursive; font-size: 18px; color: #666; font-weight: 700; }
+  .stats-grid > :nth-child(1) .stat-num { color: var(--crimson); }
+  .stats-grid > :nth-child(2) .stat-num { color: var(--cobalt); }
+  .stats-grid > :nth-child(3) .stat-num { color: var(--green); }
+
+  /* FINAL CTA */
+  .final-cta { padding: 80px 0 100px; text-align: center; position: relative; }
+  .final-title { font-family: 'Bangers', cursive; font-size: clamp(44px,7vw,72px); color: var(--ink); letter-spacing: 3px; margin-bottom: 12px; transform: rotate(-1deg); display: inline-block; }
+  .final-sub { font-family: 'Caveat', cursive; font-size: 20px; color: #666; margin-bottom: 36px; }
+  .eraser { position: absolute; width: 120px; height: 28px; background: rgba(200,190,180,0.4); border-radius: 50%; filter: blur(4px); transform: rotate(-5deg); pointer-events: none; }
+
+  /* REVEAL */
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.6s, transform 0.6s; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  footer { text-align: center; padding: 32px; font-family: 'Caveat', cursive; font-size: 16px; color: #aaa; border-top: 1px solid var(--line-blue); }
+
+  @media (max-width: 700px) {
+    .page-wrap { padding: 0 20px 0 40px; }
+    .cards-grid, .stats-grid { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: repeat(2,1fr); }
+    .steps::before { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <filter id="ink-bleed" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="4" seed="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<div class="notebook-bg"></div>
+<div class="hole-punch" style="top:100px"></div><div class="hole-punch" style="top:300px"></div>
+<div class="hole-punch" style="top:500px"></div><div class="hole-punch" style="top:700px"></div>
+<div class="hole-punch" style="top:900px"></div><div class="hole-punch" style="top:1100px"></div>
+<div class="hole-punch" style="top:1300px"></div><div class="hole-punch" style="top:1500px"></div>
+<div class="hole-punch" style="top:1700px"></div><div class="hole-punch" style="top:1900px"></div>
+<div class="hole-punch" style="top:2100px"></div><div class="hole-punch" style="top:2300px"></div>
+<div class="hole-punch" style="top:2500px"></div>
+
+<canvas id="trail-canvas"></canvas>
+<div id="cursor">
+  <svg viewBox="0 0 32 32" fill="none">
+    <rect x="13" y="2" width="6" height="18" rx="1" fill="#FFE600" stroke="#333" stroke-width="1.5"/>
+    <rect x="13" y="18" width="6" height="6" rx="0.5" fill="#f4c878" stroke="#333" stroke-width="1.5"/>
+    <polygon points="13,24 19,24 16,30" fill="#333"/>
+    <rect x="13" y="2" width="6" height="3" rx="1" fill="#aaa" stroke="#333" stroke-width="1"/>
+  </svg>
+</div>
+
+<div class="paper-plane" style="top:90px">✈️</div>
+<div class="doodle" style="right:4%;top:620px">🚀</div>
+<div class="doodle" style="right:7%;top:1050px;animation-delay:1s">👑</div>
+<div class="doodle" style="left:2%;top:1450px;transform:rotate(45deg)">🚀</div>
+<div class="doodle" style="left:3%;top:960px;animation-delay:2s">👑</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="page-wrap" style="width:100%">
+    <nav>
+      <div class="nav-logo">N·P·A·T</div>
+      <ul>
+        <li><a href="#how-to">How to Play</a></li>
+        <li><a href="#leaderboard">Top Players</a></li>
+        <li><a href="game.html">Play Now</a></li>
+      </ul>
+    </nav>
+
+    <div style="margin-top:60px; position:relative">
+      <span class="hero-eyebrow">⚡ The ultimate speed-word multiplayer game ⚡</span>
+
+      <div class="hero-title-block">
+        <div class="tape" style="top:-6px;left:-8px;transform:rotate(-35deg)"></div>
+        <div class="tape" style="top:-6px;right:-8px;transform:rotate(35deg)"></div>
+
+        <div class="npat-letters">
+          <span class="npat-n">N</span><span class="npat-dot">·</span>
+          <span class="npat-p">P</span><span class="npat-dot">·</span>
+          <span class="npat-a">A</span><span class="npat-dot">·</span>
+          <span class="npat-t">T</span>
+        </div>
+        <span class="hero-full-name">Name · Place · Animal · Thing</span>
+
+        <svg class="ink-underline" viewBox="0 0 700 20" height="20" style="bottom:-14px">
+          <path d="M 10 12 C 100 5, 200 18, 300 10 C 400 3, 500 17, 600 10 C 650 6, 680 14, 695 10"
+            stroke="#E8001D" stroke-width="4" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+
+      <p class="hero-tagline" style="margin-top:32px">
+        Race to shout a <strong>Name, Place, Animal &amp; Thing</strong> for a random letter —&nbsp;
+        <span class="typing-text" id="typing-el">before anyone else does.</span>
+      </p>
+
+      <div class="cta-row">
+        <a href="game.html" class="btn-stamp" id="play-btn">PLAY NOW</a>
+        <a href="#how-to" class="btn-outline">How It Works</a>
+      </div>
+
+      <div class="star-sticker" style="top:-10px;right:40px;transform:rotate(15deg)">⭐</div>
+      <div class="star-sticker" style="top:30px;left:20px;font-size:24px;animation-delay:1s">🌟</div>
+      <div class="star-sticker" style="bottom:20px;right:80px;font-size:28px;animation-delay:0.5s">⭐</div>
+    </div>
+  </div>
+</section>
+
+<!-- CATEGORIES -->
+<section class="categories">
+  <div class="page-wrap">
+    <p class="section-label">— The Four Categories —</p>
+    <h2 class="section-title reveal">One Letter. <span class="highlight">Four Answers.</span> Zero Mercy.</h2>
+    <div class="cards-grid">
+      <div class="card card-name reveal">
+        <div class="pushpin"><div class="pushpin-head"></div><div class="pushpin-stick"></div></div>
+        <span class="card-letter">N</span>
+        <span class="card-icon">👑</span>
+        <h3 class="card-title">Name</h3>
+        <p class="card-desc">A person's first name — real, famous, or fictional. Rare picks score more.</p>
+        <div class="card-tags"><span class="tag">Napoleon</span><span class="tag">Nora</span><span class="tag">Nikola</span></div>
+      </div>
+      <div class="card card-place reveal">
+        <div class="pushpin"><div class="pushpin-head"></div><div class="pushpin-stick"></div></div>
+        <span class="card-letter">P</span>
+        <span class="card-icon">🌍</span>
+        <h3 class="card-title">Place</h3>
+        <p class="card-desc">City, country, landmark — anywhere on Earth or beyond. Geography nerds, shine.</p>
+        <div class="card-tags"><span class="tag">Paris</span><span class="tag">Peru</span><span class="tag">Pompeii</span></div>
+      </div>
+      <div class="card card-animal reveal">
+        <div class="pushpin"><div class="pushpin-head"></div><div class="pushpin-stick"></div></div>
+        <span class="card-letter">A</span>
+        <span class="card-icon">🐻</span>
+        <h3 class="card-title">Animal</h3>
+        <p class="card-desc">Wild, domestic, prehistoric, mythical — if it breathes (or breathed), it counts.</p>
+        <div class="card-tags"><span class="tag">Narwhal</span><span class="tag">Nightjar</span><span class="tag">Newt</span></div>
+      </div>
+      <div class="card card-thing reveal">
+        <div class="pushpin"><div class="pushpin-head"></div><div class="pushpin-stick"></div></div>
+        <span class="card-letter">T</span>
+        <span class="card-icon">⚡</span>
+        <h3 class="card-title">Thing</h3>
+        <p class="card-desc">Any object, concept, or item. From notebooks to nebulae — if it exists, it works.</p>
+        <div class="card-tags"><span class="tag">Notebook</span><span class="tag">Nebula</span><span class="tag">Net</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW TO PLAY -->
+<section class="how-to" id="how-to">
+  <div class="page-wrap">
+    <p class="section-label">— Rules —</p>
+    <h2 class="section-title reveal">How to Play <span class="highlight">N·P·A·T</span></h2>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">1</div>
+        <div class="step-title">Create a Room</div>
+        <p class="step-desc">Get a 4-letter code and share it with friends. Up to 8 players per room.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">2</div>
+        <div class="step-title">Get a Letter</div>
+        <p class="step-desc">A random letter slams onto the screen. The 45-second clock starts ticking.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">3</div>
+        <div class="step-title">Fill All Four</div>
+        <p class="step-desc">Type a Name, Place, Animal, and Thing for that letter — before anyone else.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">4</div>
+        <div class="step-title">Score &amp; Win</div>
+        <p class="step-desc">Unique answers = 10 pts. Shared = 5 pts. First to submit gets a +5 speed bonus!</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LEADERBOARD -->
+<section class="lb-section" id="leaderboard">
+  <div class="page-wrap">
+    <p class="section-label">— Hall of Champions —</p>
+    <h2 class="section-title reveal">All-Time <span class="highlight">Legends</span></h2>
+    <div class="corkboard reveal">
+      <h3 class="corkboard-title">📌 CLASS RANKINGS — MAY 2026</h3>
+      <ol class="lb-list">
+        <li class="lb-item" style="--r:-0.8deg"><span class="lb-rank gold">🥇</span><div class="lb-avatar" style="background:#fff3cd">🦁</div><span class="lb-name">WordLion_X</span><span>⭐⭐⭐⭐⭐</span><span class="lb-score">9,840</span></li>
+        <li class="lb-item" style="--r:0.5deg"><span class="lb-rank silver">🥈</span><div class="lb-avatar" style="background:#e8f4ff">🐬</div><span class="lb-name">QuickDolphin</span><span>⭐⭐⭐⭐</span><span class="lb-score">8,210</span></li>
+        <li class="lb-item" style="--r:-0.3deg"><span class="lb-rank bronze">🥉</span><div class="lb-avatar" style="background:#ffe8e8">🦊</div><span class="lb-name">FoxType99</span><span>⭐⭐⭐⭐</span><span class="lb-score">7,450</span></li>
+        <li class="lb-item" style="--r:1deg"><span class="lb-rank" style="color:#666">4</span><div class="lb-avatar" style="background:#e8ffe8">🐸</div><span class="lb-name">JumpFrogger</span><span>⭐⭐⭐</span><span class="lb-score">6,780</span></li>
+        <li class="lb-item" style="--r:-0.6deg"><span class="lb-rank" style="color:#666">5</span><div class="lb-avatar" style="background:#f8e8ff">🦄</div><span class="lb-name">UnicornRush</span><span>⭐⭐⭐</span><span class="lb-score">5,990</span></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="stats">
+  <div class="page-wrap">
+    <div class="stats-grid">
+      <div class="reveal"><span class="stat-num" data-target="142000">0</span><span class="stat-label">rounds played</span></div>
+      <div class="reveal"><span class="stat-num" data-target="38000">0</span><span class="stat-label">word nerds</span></div>
+      <div class="reveal"><span class="stat-num" data-target="99">0</span><span class="stat-label">% more fun</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <div class="page-wrap">
+    <div class="eraser" style="top:20px;left:30%"></div>
+    <div class="star-sticker" style="top:-20px;left:18%;position:absolute;font-size:40px">⭐</div>
+    <div class="star-sticker" style="top:30px;right:20%;position:absolute;font-size:28px;animation-delay:0.8s">🌟</div>
+    <h2 class="final-title reveal">Your Word.<br>Your Speed.<br>Your Glory.</h2>
+    <p class="final-sub reveal">The clock is ticking. Legends are made in seconds.</p>
+    <div class="cta-row reveal">
+      <a href="game.html" class="btn-stamp" style="font-size:34px;padding:18px 56px">PLAY NOW</a>
+    </div>
+    <p style="font-family:'Caveat',cursive;font-size:15px;color:#aaa;margin-top:20px;font-style:italic">No account needed · Free forever · Up to 8 players</p>
+    <div style="margin-top:28px;font-size:26px;letter-spacing:12px;opacity:0.35">⭐ ⭐ ⭐ ⭐ ⭐</div>
+  </div>
+</section>
+
+<footer>
+  <p>Made with ✏️ and too much coffee &nbsp;·&nbsp; <strong>N·P·A·T</strong> — Name Place Animal Thing &nbsp;·&nbsp; © 2026</p>
+</footer>
+
+<script>
+  // Cursor + trail
+  const cursor = document.getElementById('cursor');
+  const canvas = document.getElementById('trail-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+  let trail = [];
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px';
+    trail.push({ x: e.clientX, y: e.clientY, age: 0, color: `hsl(${Math.random()>0.6?220:Math.random()>0.5?0:45},80%,50%)` });
+    if (trail.length > 60) trail.shift();
+  });
+  (function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for (let i=1;i<trail.length;i++) {
+      const p=trail[i], pp=trail[i-1]; p.age++;
+      const a=Math.max(0,1-p.age/60), w=Math.max(0.5,(1-p.age/60)*2.5);
+      ctx.beginPath(); ctx.moveTo(pp.x,pp.y); ctx.lineTo(p.x,p.y);
+      ctx.strokeStyle=p.color.replace('hsl','hsla').replace(')',`,${a})`);
+      ctx.lineWidth=w; ctx.lineCap='round'; ctx.stroke();
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  // Typing
+  const el = document.getElementById('typing-el');
+  const phrases = ['before anyone else does.','in less than 45 seconds.','or your opponents will.','Name · Place · Animal · Thing.'];
+  let pi=0,ci=0,del=false;
+  function type() {
+    const p=phrases[pi];
+    if(!del){ci++;el.textContent=p.slice(0,ci);if(ci===p.length){del=true;setTimeout(type,1800);return;}}
+    else{ci--;el.textContent=p.slice(0,ci);if(ci===0){del=false;pi=(pi+1)%phrases.length;}}
+    setTimeout(type,del?40:80);
+  } type();
+
+  // Stamp animation
+  document.querySelectorAll('.btn-stamp').forEach(b=>{
+    b.addEventListener('click',()=>{b.classList.remove('slam');void b.offsetWidth;b.classList.add('slam');});
+    b.addEventListener('animationend',()=>b.classList.remove('slam'));
+  });
+
+  // Scroll reveal
+  const ro = new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');}),{threshold:0.15});
+  document.querySelectorAll('.reveal').forEach(el=>ro.observe(el));
+
+  // Counters
+  const co = new IntersectionObserver(es=>es.forEach(e=>{
+    if(!e.isIntersecting)return;
+    const el=e.target, t=+el.dataset.target; let c=0;
+    const inc=t/60, timer=setInterval(()=>{c+=inc;if(c>=t){c=t;clearInterval(timer);}el.textContent=Math.floor(c).toLocaleString();},25);
+    co.unobserve(el);
+  }),{threshold:0.5});
+  document.querySelectorAll('.stat-num[data-target]').forEach(el=>co.observe(el));
+
+  // Card tilt
+  document.querySelectorAll('.card').forEach(card=>{
+    const base = getComputedStyle(card).transform;
+    card.addEventListener('mousemove',e=>{
+      const r=card.getBoundingClientRect(), x=(e.clientX-r.left)/r.width-0.5, y=(e.clientY-r.top)/r.height-0.5;
+      card.style.transform=`rotate(${x*4}deg) translateY(-8px) perspective(400px) rotateX(${-y*6}deg)`;
+    });
+    card.addEventListener('mouseleave',()=>{card.style.transform='';});
+  });
+</script>
+</body>
+</html>

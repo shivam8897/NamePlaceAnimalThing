@@ -1,0 +1,3 @@
+okay everything is great so there should be an option to host to select the rounds before proceeding the game and look through any game basic things should be there after the games finishes some poping should came like celebrations or anyhting you knwo the best roght lets make the game end to end success and game name should be name place animal thinmg okk???
+
+do it with a clear soul extremltly string visual concept piece of design
