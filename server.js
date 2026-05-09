@@ -1,6 +1,5 @@
 const express = require('express');
 const http = require('http');
-const https = require('https');
 const { Server } = require('socket.io');
 const path = require('path');
 const crypto = require('crypto');
@@ -62,23 +61,6 @@ function clusterKey(norm, keys) {
   return norm; // new cluster
 }
 
-// ─── Dictionary check (free API, cached) ─────────────────────
-const _dictCache = new Map();
-function checkDictionary(word) {
-  const key = word.toLowerCase().trim();
-  if (!key || key.length < 2) return Promise.resolve(false);
-  if (_dictCache.has(key)) return Promise.resolve(_dictCache.get(key));
-  return new Promise(resolve => {
-    const timer = setTimeout(() => { _dictCache.set(key, null); resolve(null); }, 1800);
-    https.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(key)}`, res => {
-      clearTimeout(timer);
-      const r = res.statusCode === 200;
-      _dictCache.set(key, r);
-      resolve(r);
-    }).on('error', () => { clearTimeout(timer); _dictCache.set(key, null); resolve(null); });
-  });
-}
-
 const rooms = new Map();
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -112,7 +94,6 @@ function makeRoom(hostId, hostName, hostAvatar, opts = {}) {
     submissionOrder: [],
     roundScores: null, autoCount: 0,
     answerVotes: new Map(), // key:`${pid}_${field}` → { up:Set, down:Set }
-    dictStatus:  {},        // `${pid}_${field}` → true|false|null
     evalData: {}, evalTimer: null, evalTimeLeft: 0,
     scoringDone: new Set(),
   };
@@ -165,14 +146,13 @@ function getEffectiveValidity(room, pid, field) {
   const ea = room.evalData[pid]?.answers[field];
   if (!ea || ea.status === 'blank') return false;
   if (ea.status === 'auto_invalid') return false;
-  if (ea.status === 'auto_valid')   return true;   // dict confirmed
-  // 'needs_vote': majority invalid → invalid, otherwise valid
+  // needs_vote: majority invalid → invalid, otherwise benefit of doubt
   const v = room.answerVotes.get(`${pid}_${field}`);
   if (v) {
     const eligible = Math.max(1, room.players.size - 1);
     if (v.down.size > eligible / 2) return false;
   }
-  return true; // benefit of doubt
+  return true;
 }
 
 function scoreRound(room) {
@@ -264,7 +244,6 @@ function startRound(room) {
   room.submissionOrder = [];
   room.roundScores = null;
   room.answerVotes  = new Map();
-  room.dictStatus   = {};
   room.evalData     = {};
   room.scoringDone  = new Set();
   clearInterval(room.evalTimer);
@@ -283,47 +262,34 @@ function startRound(room) {
   }, 1000);
 }
 
-async function endRound(room) {
+function endRound(room) {
   if (room.state !== 'playing') return;
   clearInterval(room.timer);
   room.state = 'evaluating';
 
   const fields = ['name', 'place', 'animal', 'thing'];
 
-  // Dictionary check: Animals & Things only (Names/Places are proper nouns → always needs_vote)
-  const dictChecks = [];
-  room.submissions.forEach((sub, pid) => {
-    ['animal','thing'].forEach(f => {
-      const raw = (sub[f]||'').trim();
-      if (!raw || !validateAnswer(raw, room.letter).valid) return;
-      const key = `${pid}_${f}`;
-      dictChecks.push(checkDictionary(raw).then(r => { room.dictStatus[key] = r; }));
-    });
-  });
-  try { await Promise.all(dictChecks); } catch(e) {}
-
-  // Build evaluation data — what each player submitted, and its auto-status
+  // Only auto-check: does the answer start with the correct letter?
+  // Everything else goes to voters.
   room.submissions.forEach((sub, pid) => {
     const player = room.players.get(pid);
     room.evalData[pid] = { name: player?.name||'?', avatar: player?.avatar||'🦁', answers: {} };
     fields.forEach(f => {
-      const raw   = (sub[f]||'').trim();
-      const basic = validateAnswer(raw, room.letter);
-      const key   = `${pid}_${f}`;
-      let status;
-      if (!raw)             status = 'blank';
-      else if (!basic.valid) status = 'auto_invalid';
-      else if (f === 'animal' || f === 'thing') {
-        const d = room.dictStatus[key];
-        status = d === true ? 'auto_valid' : 'needs_vote';
+      const raw = (sub[f]||'').trim();
+      let status, note = '';
+      if (!raw) {
+        status = 'blank';
+      } else if (raw[0].toUpperCase() !== room.letter.toUpperCase()) {
+        status = 'auto_invalid';
+        note   = `Must start with "${room.letter}"`;
       } else {
-        status = 'needs_vote'; // name / place: always up for vote
+        status = 'needs_vote';
       }
-      room.evalData[pid].answers[f] = { answer: raw, status, note: basic.reason };
+      room.evalData[pid].answers[f] = { answer: raw, status, note };
     });
   });
 
-  const EVAL_TIME = VOTE_DURATION; // 60 s
+  const EVAL_TIME = VOTE_DURATION;
   room.evalTimeLeft = EVAL_TIME;
 
   io.to(room.code).emit('evaluation:start', {

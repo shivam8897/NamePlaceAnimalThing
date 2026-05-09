@@ -567,9 +567,7 @@
     font-family:'Caveat',cursive; font-size:12px; font-weight:700;
     padding:3px 8px; border-radius:3px; white-space:nowrap;
   }
-  .ev-status-badge.auto-v { background:#e0ffe8; color:#007a30; }
   .ev-status-badge.auto-i { background:#ffe8e8; color:#c00; }
-  .ev-status-badge.dict-v { background:#e0ffe8; color:#007a30; }
 
   .ev-vote-pair { display:flex; gap:6px; }
   .evb {
@@ -1361,13 +1359,6 @@ function renderEvaluation({ evalData, letter, round, maxRounds, evalTime }) {
           <span class="ev-field-label">${FL[f]}</span>
           <span class="ev-ans-txt auto-invalid">${esc(a.answer)}</span>
           <span class="ev-status-badge auto-i">✗ Invalid</span>
-        </div>`;
-      }
-      if (a.status === 'auto_valid') {
-        return `<div class="ev-row">
-          <span class="ev-field-label">${FL[f]}</span>
-          <span class="ev-ans-txt">${esc(a.answer)}</span>
-          <span class="ev-status-badge dict-v">📖 Verified</span>
         </div>`;
       }
       // needs_vote — show buttons (disabled if own answer)
