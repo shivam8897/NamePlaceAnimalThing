@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const { Server } = require('socket.io');
 const path = require('path');
 const crypto = require('crypto');
@@ -13,34 +14,77 @@ app.use(express.json());
 
 // ─── Config ──────────────────────────────────────────────────
 const LETTERS        = 'BCDFGHJKLMNPRST'.split('');
-const ROUND_TIME     = 45;
-const DEFAULT_ROUNDS = 5;
-const AUTO_ADVANCE   = 30;
+const DEFAULT_ROUND_TIME = 30;
+const DEFAULT_ROUNDS     = 10;
+const DEFAULT_MAX        = 8;
+const AUTO_ADVANCE       = 30;
+const TIMER_OPTIONS      = [10, 20, 30, 60];
+const ROUND_OPTIONS      = [3, 5, 10];
 
-// Speed bonus — only awarded when player filled 3+ valid answers
-const SPEED_BONUS = [8, 5, 3, 1]; // 1st, 2nd, 3rd, 4th+ (index 3 used for all beyond)
+// Speed bonus for ranked submission order (multiple players rewarded)
+const SPEED_BONUS = [20, 15, 10, 7, 5]; // index 4 used for 5th and beyond
 
-// Shared-answer tiers: score based on how many others wrote the same word
-// key = number of players with that answer, value = points awarded
-function sharedPoints(count) {
-  if (count === 1) return 10; // unique
-  if (count === 2) return 7;  // 1 other
-  if (count === 3) return 5;  // 2 others
-  return 3;                   // 3+ others
+const UNIQUE_PTS   = 100;
+const SHARED_PTS   = 50;
+const FULL_HOUSE_BONUS = 20;
+const LAST_ROUND_MULT  = 1.5;
+const VOTE_DURATION    = 60; // seconds for the evaluation phase
+
+// ─── Fuzzy matching ──────────────────────────────────────────
+function normAnswer(s) {
+  return s.toLowerCase().replace(/[\s\-'.]/g, '');
 }
 
-const LONG_WORD_BONUS     = 1; // answer is 8–10 chars
-const VERY_LONG_WORD_BONUS = 2; // answer is 11+ chars
-const FULL_HOUSE_BONUS    = 5;  // all 4 categories filled and valid
-const INVALID_PENALTY     = -2; // submitting a clearly invalid answer
-const LAST_ROUND_MULT     = 1.5; // final round multiplier
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, (_, i) =>
+    Array.from({length: n+1}, (_, j) => i === 0 ? j : j === 0 ? i : 0)
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+// Cluster a new normalized answer into existing cluster keys
+function clusterKey(norm, keys) {
+  if (!norm) return '';
+  for (const k of keys) {
+    if (!k) continue;
+    if (norm === k) return k;
+    // Fuzzy only for words 4+ chars; allow 1 edit (one-letter typo)
+    if (norm.length >= 4 && k.length >= 4 && editDistance(norm, k) <= 1) return k;
+  }
+  return norm; // new cluster
+}
+
+// ─── Dictionary check (free API, cached) ─────────────────────
+const _dictCache = new Map();
+function checkDictionary(word) {
+  const key = word.toLowerCase().trim();
+  if (!key || key.length < 2) return Promise.resolve(false);
+  if (_dictCache.has(key)) return Promise.resolve(_dictCache.get(key));
+  return new Promise(resolve => {
+    const timer = setTimeout(() => { _dictCache.set(key, null); resolve(null); }, 1800);
+    https.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(key)}`, res => {
+      clearTimeout(timer);
+      const r = res.statusCode === 200;
+      _dictCache.set(key, r);
+      resolve(r);
+    }).on('error', () => { clearTimeout(timer); _dictCache.set(key, null); resolve(null); });
+  });
+}
 
 const rooms = new Map();
 
 // ─── Helpers ─────────────────────────────────────────────────
 function genCode() {
   let c;
-  do { c = crypto.randomBytes(2).toString('hex').toUpperCase(); } while (rooms.has(c));
+  do { c = crypto.randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(c));
   return c;
 }
 
@@ -49,18 +93,27 @@ function pickLetter(used) {
   return (pool.length ? pool : LETTERS)[Math.floor(Math.random() * (pool.length || LETTERS.length))];
 }
 
-function makeRoom(hostId, hostName) {
-  const code = genCode();
+function makeRoom(hostId, hostName, hostAvatar, opts = {}) {
+  const code      = genCode();
+  const roundTime = TIMER_OPTIONS.includes(+opts.timer)   ? +opts.timer   : DEFAULT_ROUND_TIME;
+  const maxRounds = ROUND_OPTIONS.includes(+opts.rounds)  ? +opts.rounds  : DEFAULT_ROUNDS;
+  const maxPlayers= Math.min(8, Math.max(2, parseInt(opts.maxPlayers) || DEFAULT_MAX));
+  const isPublic  = opts.isPublic !== false;
+
   const room = {
     code, host: hostId,
-    players: new Map([[hostId, { name: hostName, score: 0 }]]),
+    players: new Map([[hostId, { name: hostName, score: 0, avatar: hostAvatar || '🦁' }]]),
     state: 'waiting',
-    round: 0, maxRounds: DEFAULT_ROUNDS,
+    round: 0, maxRounds, maxPlayers, roundTime, isPublic,
     letter: null, usedLetters: [],
     timer: null, autoTimer: null,
-    timeLeft: ROUND_TIME, roundStartTime: null,
-    submissions: new Map(),   // id → { name, place, animal, thing, submittedAt }
-    submissionOrder: [],      // ids in order of submission
+    timeLeft: roundTime, roundStartTime: null,
+    submissions: new Map(),
+    submissionOrder: [],
+    roundScores: null, autoCount: 0,
+    answerVotes: new Map(), // key:`${pid}_${field}` → { up:Set, down:Set }
+    dictStatus:  {},        // `${pid}_${field}` → true|false|null
+    evalData: {}, evalTimer: null, evalTimeLeft: 0,
   };
   rooms.set(code, room);
   return room;
@@ -70,56 +123,75 @@ function publicRoom(room) {
   return {
     code: room.code, state: room.state,
     round: room.round, maxRounds: room.maxRounds,
+    maxPlayers: room.maxPlayers, roundTime: room.roundTime,
+    isPublic: room.isPublic,
     letter: room.letter, timeLeft: room.timeLeft, host: room.host,
     players: Array.from(room.players.entries()).map(([id, p]) => ({
-      id, name: p.name, score: p.score,
+      id, name: p.name, score: p.score, avatar: p.avatar || '🦁',
       submitted: room.submissions.has(id),
     })),
   };
 }
 
-// ─── Validation (no external API) ────────────────────────────
+function roomSummary(room) {
+  const host = room.players.get(room.host);
+  return {
+    code: room.code, isPublic: room.isPublic,
+    hostName: host?.name || '?', hostAvatar: host?.avatar || '🦁',
+    playerCount: room.players.size, maxPlayers: room.maxPlayers,
+    maxRounds: room.maxRounds, roundTime: room.roundTime,
+  };
+}
+
+// ─── Validation ──────────────────────────────────────────────
 function validateAnswer(answer, letter) {
   if (!answer || !answer.trim()) return { valid: true };
   const s = answer.trim();
-
   if (s[0].toUpperCase() !== letter.toUpperCase())
     return { valid: false, reason: `Must start with "${letter}"` };
-
   if (s.replace(/[\s\-']/g, '').length < 2)
     return { valid: false, reason: 'Too short (min 2 letters)' };
-
   if (!/^[a-zA-Z\s\-'.]+$/.test(s))
     return { valid: false, reason: 'Letters only, no numbers' };
-
-  // Repeated single char gibberish (e.g. "NNNNN", "aaaa")
   const alpha = s.replace(/[^a-zA-Z]/g, '');
   if (alpha.length >= 3 && new Set(alpha.toLowerCase()).size === 1)
     return { valid: false, reason: 'Not a real word' };
-
   return { valid: true };
 }
 
-// ─── Scoring ─────────────────────────────────────────────────
+// ─── Scoring (runs after evaluation phase) ───────────────────
+function getEffectiveValidity(room, pid, field) {
+  const ea = room.evalData[pid]?.answers[field];
+  if (!ea || ea.status === 'blank') return false;
+  if (ea.status === 'auto_invalid') return false;
+  if (ea.status === 'auto_valid')   return true;   // dict confirmed
+  // 'needs_vote': majority invalid → invalid, otherwise valid
+  const v = room.answerVotes.get(`${pid}_${field}`);
+  if (v) {
+    const eligible = Math.max(1, room.players.size - 1);
+    if (v.down.size > eligible / 2) return false;
+  }
+  return true; // benefit of doubt
+}
+
 function scoreRound(room) {
   const fields    = ['name', 'place', 'animal', 'thing'];
   const isLastRnd = room.round >= room.maxRounds;
 
-  // 1. Validate every submitted answer
-  const valid = {};
-  room.submissions.forEach((sub, pid) => {
-    valid[pid] = {};
-    fields.forEach(f => { valid[pid][f] = validateAnswer(sub[f], room.letter); });
-  });
+  // Build fuzzy cluster frequency maps using only effectively-valid answers
+  const clusterFreq   = {};
+  const answerCluster = {};
+  fields.forEach(f => { clusterFreq[f] = {}; answerCluster[f] = {}; });
 
-  // 2. Frequency map — only valid, non-empty answers count toward shared scoring
-  const freq = {};
-  fields.forEach(f => { freq[f] = {}; });
   room.submissions.forEach((sub, pid) => {
     fields.forEach(f => {
-      if (!valid[pid][f].valid) return;
-      const a = (sub[f] || '').trim().toLowerCase();
-      if (a) freq[f][a] = (freq[f][a] || 0) + 1;
+      if (!getEffectiveValidity(room, pid, f)) return;
+      const raw = (sub[f] || '').trim();
+      if (!raw) return;
+      const norm = normAnswer(raw);
+      const key  = clusterKey(norm, Object.keys(clusterFreq[f]));
+      answerCluster[f][pid] = key;
+      clusterFreq[f][key]   = (clusterFreq[f][key] || 0) + 1;
     });
   });
 
@@ -129,79 +201,46 @@ function scoreRound(room) {
     const sub = room.submissions.get(pid) || {};
     let roundPts = 0;
     const breakdown = {};
-    let validFilledCount = 0;  // how many categories this player filled with valid answers
+    let validFilledCount = 0;
 
-    // ── Per-field score ──────────────────────────────────────
     fields.forEach(f => {
       const raw = (sub[f] || '').trim();
-      const key = raw.toLowerCase();
-      const v   = valid[pid]?.[f] || { valid: true };
+      const ea  = room.evalData[pid]?.answers[f];
+      const effective = getEffectiveValidity(room, pid, f);
 
-      if (!key) {
-        // Blank — no points, no penalty
+      if (!raw || ea?.status === 'blank') {
         breakdown[f] = { answer: '', points: 0, reason: 'blank' };
-
-      } else if (!v.valid) {
-        // Invalid — small penalty to discourage gibberish spam
-        breakdown[f] = { answer: raw, points: INVALID_PENALTY, reason: 'invalid', note: v.reason };
-        roundPts += INVALID_PENALTY;
-
+      } else if (ea?.status === 'auto_invalid') {
+        breakdown[f] = { answer: raw, points: 0, reason: 'invalid', note: ea.note };
+      } else if (!effective) {
+        breakdown[f] = { answer: raw, points: 0, reason: 'voted_invalid' };
       } else {
-        // Valid answer — score by how many others wrote the same thing
-        const count  = freq[f][key] || 1;
-        const pts    = sharedPoints(count);
-        const reason = count === 1 ? 'unique'
-                     : count === 2 ? 'shared-1'
-                     : count === 3 ? 'shared-2'
-                     : 'shared-3+';
-
-        // Long word bonus (applies on top of answer score)
-        const wordLen  = raw.replace(/[\s\-']/g, '').length;
-        const lenBonus = wordLen >= 11 ? VERY_LONG_WORD_BONUS
-                       : wordLen >= 8  ? LONG_WORD_BONUS
-                       : 0;
-
-        breakdown[f] = { answer: raw, points: pts, reason, lenBonus };
-        roundPts += pts + lenBonus;
+        const ck    = answerCluster[f][pid];
+        const count = ck ? (clusterFreq[f][ck] || 1) : 1;
+        const pts   = count === 1 ? UNIQUE_PTS : SHARED_PTS;
+        breakdown[f] = { answer: raw, points: pts, reason: count === 1 ? 'unique' : 'shared', sharedCount: count };
+        roundPts += pts;
         validFilledCount++;
       }
     });
 
-    // ── Full house bonus: all 4 valid and filled ─────────────
-    if (validFilledCount === 4) {
-      breakdown._fullHouse = FULL_HOUSE_BONUS;
-      roundPts += FULL_HOUSE_BONUS;
-    }
+    if (validFilledCount === 4) { breakdown._fullHouse = FULL_HOUSE_BONUS; roundPts += FULL_HOUSE_BONUS; }
 
-    // ── Speed bonus: only if player filled 3+ valid answers ──
     if (validFilledCount >= 3) {
       const rank = room.submissionOrder.indexOf(pid);
       if (rank >= 0) {
         const spd = SPEED_BONUS[Math.min(rank, SPEED_BONUS.length - 1)];
-        breakdown._speedBonus = spd;
-        breakdown._speedRank  = rank + 1;
-        roundPts += spd;
+        breakdown._speedBonus = spd; breakdown._speedRank = rank + 1; roundPts += spd;
       }
     }
 
-    // ── Last-round multiplier (round to nearest integer) ─────
     if (isLastRnd && roundPts > 0) {
       const bonus = Math.round(roundPts * (LAST_ROUND_MULT - 1));
-      breakdown._lastRoundBonus = bonus;
-      roundPts += bonus;
+      breakdown._lastRoundBonus = bonus; roundPts += bonus;
     }
 
-    // Clamp to 0 minimum (can't go negative on the round)
-    roundPts = Math.max(0, roundPts);
-
     player.score += roundPts;
-    results[pid] = {
-      name: player.name,
-      roundPts,
-      totalScore: player.score,
-      breakdown,
-      isLastRound: isLastRnd,
-    };
+    results[pid] = { name: player.name, roundPts, totalScore: player.score, breakdown, isLastRound: isLastRnd };
   });
 
   return results;
@@ -209,7 +248,7 @@ function scoreRound(room) {
 
 function leaderboard(room) {
   return Array.from(room.players.entries())
-    .map(([id, p]) => ({ id, name: p.name, score: p.score }))
+    .map(([id, p]) => ({ id, name: p.name, score: p.score, avatar: p.avatar || '🦁' }))
     .sort((a, b) => b.score - a.score);
 }
 
@@ -217,17 +256,22 @@ function leaderboard(room) {
 function startRound(room) {
   clearInterval(room.autoTimer);
   room.round++;
-  room.state        = 'playing';
-  room.letter       = pickLetter(room.usedLetters);
+  room.state = 'playing';
+  room.letter = pickLetter(room.usedLetters);
   room.usedLetters.push(room.letter);
   room.submissions.clear();
   room.submissionOrder = [];
-  room.timeLeft     = ROUND_TIME;
+  room.roundScores = null;
+  room.answerVotes  = new Map();
+  room.dictStatus   = {};
+  room.evalData     = {};
+  clearInterval(room.evalTimer);
+  room.timeLeft = room.roundTime;
   room.roundStartTime = Date.now();
 
   io.to(room.code).emit('round:start', {
     round: room.round, maxRounds: room.maxRounds,
-    letter: room.letter, timeLeft: ROUND_TIME,
+    letter: room.letter, timeLeft: room.roundTime, roundTime: room.roundTime,
   });
 
   room.timer = setInterval(() => {
@@ -237,82 +281,164 @@ function startRound(room) {
   }, 1000);
 }
 
-function endRound(room) {
+async function endRound(room) {
   if (room.state !== 'playing') return;
   clearInterval(room.timer);
+  room.state = 'evaluating';
+
+  const fields = ['name', 'place', 'animal', 'thing'];
+
+  // Dictionary check: Animals & Things only (Names/Places are proper nouns → always needs_vote)
+  const dictChecks = [];
+  room.submissions.forEach((sub, pid) => {
+    ['animal','thing'].forEach(f => {
+      const raw = (sub[f]||'').trim();
+      if (!raw || !validateAnswer(raw, room.letter).valid) return;
+      const key = `${pid}_${f}`;
+      dictChecks.push(checkDictionary(raw).then(r => { room.dictStatus[key] = r; }));
+    });
+  });
+  try { await Promise.all(dictChecks); } catch(e) {}
+
+  // Build evaluation data — what each player submitted, and its auto-status
+  room.submissions.forEach((sub, pid) => {
+    const player = room.players.get(pid);
+    room.evalData[pid] = { name: player?.name||'?', avatar: player?.avatar||'🦁', answers: {} };
+    fields.forEach(f => {
+      const raw   = (sub[f]||'').trim();
+      const basic = validateAnswer(raw, room.letter);
+      const key   = `${pid}_${f}`;
+      let status;
+      if (!raw)             status = 'blank';
+      else if (!basic.valid) status = 'auto_invalid';
+      else if (f === 'animal' || f === 'thing') {
+        const d = room.dictStatus[key];
+        status = d === true ? 'auto_valid' : 'needs_vote';
+      } else {
+        status = 'needs_vote'; // name / place: always up for vote
+      }
+      room.evalData[pid].answers[f] = { answer: raw, status, note: basic.reason };
+    });
+  });
+
+  const EVAL_TIME = VOTE_DURATION; // 60 s
+  room.evalTimeLeft = EVAL_TIME;
+
+  io.to(room.code).emit('evaluation:start', {
+    evalData: room.evalData, letter: room.letter,
+    round: room.round, maxRounds: room.maxRounds, evalTime: EVAL_TIME,
+  });
+
+  room.evalTimer = setInterval(() => {
+    room.evalTimeLeft--;
+    io.to(room.code).emit('evaluation:tick', { timeLeft: room.evalTimeLeft });
+    if (room.evalTimeLeft <= 0) { clearInterval(room.evalTimer); finalizeEvaluation(room); }
+  }, 1000);
+}
+
+function finalizeEvaluation(room) {
+  if (room.state !== 'evaluating') return;
+  clearInterval(room.evalTimer);
   room.state = 'scoring';
 
   const scores = scoreRound(room);
+  room.roundScores = scores;
   const lb     = leaderboard(room);
   const isLast = room.round >= room.maxRounds;
 
   io.to(room.code).emit('round:end', {
-    scores, leaderboard: lb,
-    round: room.round, maxRounds: room.maxRounds, isLastRound: isLast,
+    scores, leaderboard: lb, round: room.round, maxRounds: room.maxRounds, isLastRound: isLast,
   });
 
   if (isLast) {
-    setTimeout(() => {
-      room.state = 'gameover';
-      io.to(room.code).emit('game:over', { leaderboard: lb });
-    }, 10000);
+    setTimeout(() => { room.state = 'gameover'; io.to(room.code).emit('game:over', { leaderboard: lb }); }, 10000);
     return;
   }
 
-  // Auto-advance countdown
-  let autoCount = AUTO_ADVANCE;
-  io.to(room.code).emit('auto:advance', { seconds: autoCount });
+  room.autoCount = AUTO_ADVANCE;
+  io.to(room.code).emit('auto:advance', { seconds: room.autoCount });
   room.autoTimer = setInterval(() => {
-    autoCount--;
-    io.to(room.code).emit('auto:tick', { seconds: autoCount });
-    if (autoCount <= 0) {
-      clearInterval(room.autoTimer);
-      if (room.state === 'scoring') startRound(room);
-    }
+    room.autoCount--;
+    io.to(room.code).emit('auto:tick', { seconds: room.autoCount });
+    if (room.autoCount <= 0) { clearInterval(room.autoTimer); if (room.state === 'scoring') startRound(room); }
   }, 1000);
+}
+
+// ─── Smart join — fills most-populated public rooms first ────
+function findBestPublicRoom(exclude) {
+  return Array.from(rooms.values())
+    .filter(r => r.isPublic && r.state === 'waiting' && r.players.size < r.maxPlayers)
+    .filter(r => !exclude || r.host !== exclude)
+    .sort((a, b) => (b.players.size / b.maxPlayers) - (a.players.size / a.maxPlayers))[0] || null;
 }
 
 // ─── Socket events ───────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log('[+]', socket.id);
 
-  socket.on('room:create', ({ name }) => {
+  socket.on('room:create', ({ name, avatar, opts }) => {
     if (!name?.trim()) return socket.emit('err', 'Name is required');
-    const room = makeRoom(socket.id, name.trim());
+    const room = makeRoom(socket.id, name.trim(), avatar || '🦁', opts || {});
     socket.join(room.code);
     socket.emit('room:joined', { isHost: true, ...publicRoom(room) });
+    if (room.isPublic) io.emit('rooms:updated');
   });
 
-  socket.on('room:join', ({ code, name }) => {
+  socket.on('room:join', ({ code, name, avatar }) => {
     code = (code || '').toUpperCase().trim();
     name = (name || '').trim();
     if (!name || !code) return socket.emit('err', 'Name and room code required');
     const room = rooms.get(code);
-    if (!room)                   return socket.emit('err', 'Room not found — check the code');
+    if (!room)                    return socket.emit('err', 'Room not found — check the code');
     if (room.state !== 'waiting') return socket.emit('err', 'Game already in progress');
-    if (room.players.size >= 8)  return socket.emit('err', 'Room is full (max 8 players)');
+    if (room.players.size >= room.maxPlayers) return socket.emit('err', `Room is full (max ${room.maxPlayers})`);
     if (Array.from(room.players.values()).some(p => p.name.toLowerCase() === name.toLowerCase()))
       return socket.emit('err', 'That name is already taken');
-    room.players.set(socket.id, { name, score: 0 });
+    room.players.set(socket.id, { name, score: 0, avatar: avatar || '🦁' });
     socket.join(code);
     socket.emit('room:joined', { isHost: false, ...publicRoom(room) });
     socket.to(code).emit('room:update', publicRoom(room));
+    if (room.isPublic) io.emit('rooms:updated');
+  });
+
+  // Smart quick-join: finds the most-populated public waiting room
+  socket.on('room:quick-join', ({ name, avatar }) => {
+    name = (name || '').trim();
+    if (!name) return socket.emit('err', 'Name is required');
+    const best = findBestPublicRoom();
+    if (!best) {
+      // No suitable room — create a default public one
+      const room = makeRoom(socket.id, name, avatar || '🦁', { isPublic: true });
+      socket.join(room.code);
+      socket.emit('room:joined', { isHost: true, quickJoinCreated: true, ...publicRoom(room) });
+      io.emit('rooms:updated');
+      return;
+    }
+    if (Array.from(best.players.values()).some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      // Name collision — still join but note it
+      return socket.emit('err', 'That name is taken in the best available room. Try another name.');
+    }
+    best.players.set(socket.id, { name, score: 0, avatar: avatar || '🦁' });
+    socket.join(best.code);
+    socket.emit('room:joined', { isHost: false, ...publicRoom(best) });
+    socket.to(best.code).emit('room:update', publicRoom(best));
+    io.emit('rooms:updated');
   });
 
   socket.on('room:set-rounds', ({ code, rounds }) => {
     const room = rooms.get(code);
     if (!room || room.host !== socket.id || room.state !== 'waiting') return;
-    room.maxRounds = Math.min(10, Math.max(1, parseInt(rounds) || DEFAULT_ROUNDS));
-    io.to(code).emit('room:update', publicRoom(room));
+    if (ROUND_OPTIONS.includes(+rounds)) { room.maxRounds = +rounds; io.to(code).emit('room:update', publicRoom(room)); }
   });
 
   socket.on('game:start', ({ code }) => {
     const room = rooms.get(code);
-    if (!room)                         return socket.emit('err', 'Room not found');
-    if (room.host !== socket.id)       return socket.emit('err', 'Only the host can start');
-    if (room.state !== 'waiting')      return socket.emit('err', 'Game already started');
-    if (room.players.size < 2)         return socket.emit('err', 'Need at least 2 players');
+    if (!room)                    return socket.emit('err', 'Room not found');
+    if (room.host !== socket.id)  return socket.emit('err', 'Only the host can start');
+    if (room.state !== 'waiting') return socket.emit('err', 'Game already started');
+    if (room.players.size < 2)    return socket.emit('err', 'Need at least 2 players');
     room.state = 'countdown';
+    if (room.isPublic) io.emit('rooms:updated');
     let count = 3;
     io.to(code).emit('game:countdown', { count });
     const cd = setInterval(() => {
@@ -333,11 +459,7 @@ io.on('connection', (socket) => {
       submittedAt: Date.now(),
     });
     room.submissionOrder.push(socket.id);
-    io.to(code).emit('player:submitted', {
-      id: socket.id,
-      submittedCount: room.submissions.size,
-      totalPlayers: room.players.size,
-    });
+    io.to(code).emit('player:submitted', { id: socket.id, submittedCount: room.submissions.size, totalPlayers: room.players.size });
     if (room.submissions.size >= room.players.size) endRound(room);
   });
 
@@ -348,14 +470,32 @@ io.on('connection', (socket) => {
     if (room.round < room.maxRounds) startRound(room);
   });
 
+  // Evaluation voting — records votes during the 60s evaluation phase
+  socket.on('vote:answer', ({ code, targetPid, field, invalid }) => {
+    const room = rooms.get(code);
+    if (!room || room.state !== 'evaluating') return;
+    if (targetPid === socket.id) return;
+    if (!['name','place','animal','thing'].includes(field)) return;
+    // Only allow voting on 'needs_vote' answers
+    if (room.evalData[targetPid]?.answers[field]?.status !== 'needs_vote') return;
+
+    const key = `${targetPid}_${field}`;
+    if (!room.answerVotes.has(key)) room.answerVotes.set(key, { up:new Set(), down:new Set() });
+    const v = room.answerVotes.get(key);
+    if (invalid) { v.up.delete(socket.id); v.down.add(socket.id); }
+    else         { v.down.delete(socket.id); v.up.add(socket.id); }
+    // No live score broadcast — scores calculated at end of evaluation
+  });
+
   socket.on('room:restart', ({ code }) => {
     const room = rooms.get(code);
     if (!room || room.host !== socket.id) return;
     room.players.forEach(p => { p.score = 0; });
     room.round = 0; room.state = 'waiting';
     room.usedLetters = []; room.submissions.clear(); room.submissionOrder = [];
-    clearInterval(room.timer); clearInterval(room.autoTimer);
+    clearInterval(room.timer); clearInterval(room.autoTimer); clearInterval(room.evalTimer);
     io.to(code).emit('room:restarted', publicRoom(room));
+    if (room.isPublic) io.emit('rooms:updated');
   });
 
   socket.on('disconnect', () => {
@@ -366,15 +506,15 @@ io.on('connection', (socket) => {
       room.players.delete(socket.id);
 
       if (room.players.size === 0) {
-        clearInterval(room.timer); clearInterval(room.autoTimer);
-        rooms.delete(code); return;
+        clearInterval(room.timer); clearInterval(room.autoTimer); clearInterval(room.evalTimer);
+        rooms.delete(code);
+        io.emit('rooms:updated');
+        return;
       }
 
       if (room.host === socket.id) {
         room.host = room.players.keys().next().value;
-        io.to(code).emit('host:changed', {
-          newHost: room.host, newHostName: room.players.get(room.host)?.name,
-        });
+        io.to(code).emit('host:changed', { newHost: room.host, newHostName: room.players.get(room.host)?.name });
       }
 
       io.to(code).emit('player:left', { id: socket.id, name, ...publicRoom(room) });
@@ -384,11 +524,21 @@ io.on('connection', (socket) => {
         room.submissionOrder.push(socket.id);
         if (room.submissions.size >= room.players.size) endRound(room);
       }
+
+      if (room.isPublic && room.state === 'waiting') io.emit('rooms:updated');
     });
   });
 });
 
 // ─── REST ─────────────────────────────────────────────────────
+app.get('/api/rooms', (req, res) => {
+  const list = Array.from(rooms.values())
+    .filter(r => r.state === 'waiting')
+    .map(roomSummary)
+    .sort((a, b) => b.playerCount - a.playerCount);
+  res.json(list);
+});
+
 app.get('/api/room/:code', (req, res) => {
   const room = rooms.get(req.params.code.toUpperCase());
   if (!room) return res.status(404).json({ error: 'Not found' });

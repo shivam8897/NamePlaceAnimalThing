@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>N·P·A·T — Name Place Animal Thing</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Caveat:wght@400;700&family=Special+Elite&family=Bangers&family=Patrick+Hand&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Bangers&family=Comic+Neue:wght@400;700&display=swap');
 
   :root {
     --yellow: #FFE600;
@@ -21,9 +21,10 @@
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background-color: var(--paper); font-family: 'Patrick Hand', cursive; overflow-x: hidden; cursor: none; }
+  body { background-color: var(--paper); font-family: 'Comic Neue', 'Comic Sans MS', cursive; overflow-x: hidden; cursor: none; }
 
-  #cursor { position: fixed; width: 32px; height: 32px; pointer-events: none; z-index: 9999; transform: translate(-4px, -28px) rotate(-30deg); }
+  /* tip at (16,2); after rotate(-135deg) it lands at (6.1,25.9) → translate(-6,-26) aligns tip to mouse */
+  #cursor { position: fixed; width: 32px; height: 32px; pointer-events: none; z-index: 9999; transform: translate(-6px, -26px) rotate(-135deg); }
   #trail-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9998; opacity: 0.35; }
 
   .notebook-bg {
@@ -47,15 +48,45 @@
   .page-wrap { max-width: 1100px; margin: 0 auto; padding: 0 90px 0 100px; position: relative; }
 
   /* NAV */
-  nav { display: flex; justify-content: space-between; align-items: center; padding: 24px 0 0; }
-  .nav-logo { font-family: 'Bangers', cursive; font-size: 26px; color: var(--cobalt); letter-spacing: 3px; text-shadow: 2px 2px 0 var(--crimson); }
-  nav ul { display: flex; gap: 24px; list-style: none; }
-  nav a { font-family: 'Caveat', cursive; font-size: 18px; font-weight: 700; color: var(--ink); text-decoration: underline wavy var(--cobalt); text-underline-offset: 4px; cursor: none; }
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 24px 0 0; gap: 12px; flex-wrap: wrap; }
+  .nav-logo { display: flex; align-items: center; gap: 3px; text-decoration: none; cursor: none; }
+  .nl {
+    font-family: 'Bangers', cursive; font-size: 21px; letter-spacing: 0.5px;
+    width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; color: white; line-height: 1;
+    transition: transform 0.15s;
+  }
+  .nl:hover { transform: translateY(-3px) rotate(-6deg) scale(1.1); }
+  .nl-n { background: var(--crimson); box-shadow: 0 4px 0 #8b0000, 0 4px 8px rgba(232,0,29,0.3); }
+  .nl-p { background: var(--cobalt);  box-shadow: 0 4px 0 #0a1a9a, 0 4px 8px rgba(26,58,255,0.3); }
+  .nl-a { background: var(--green);   box-shadow: 0 4px 0 #007a30, 0 4px 8px rgba(0,196,79,0.3); }
+  .nl-t { background: var(--orange);  box-shadow: 0 4px 0 #c04400, 0 4px 8px rgba(255,107,0,0.3); }
+  nav ul { display: flex; gap: 14px; list-style: none; flex-wrap: wrap; }
+
+  /* Sticker-style nav links */
+  .nav-sticker {
+    font-family: 'Comic Neue', 'Comic Sans MS', cursive;
+    font-size: 15px; font-weight: 700;
+    text-decoration: none; display: inline-block;
+    padding: 7px 16px; border-radius: 3px;
+    border: 2px solid; cursor: none;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.18);
+    transition: transform 0.18s, box-shadow 0.18s;
+  }
+  .nav-sticker:hover { transform: rotate(0deg) translateY(-2px) scale(1.06); box-shadow: 4px 5px 0 rgba(0,0,0,0.22); }
+  .ns-howto {
+    background: #fff9b0; color: #7a5c00;
+    border-color: #e6c200; transform: rotate(-2deg);
+  }
+  .ns-top {
+    background: #c8f7dc; color: #0a5c2e;
+    border-color: #44bb77; transform: rotate(1.5deg);
+  }
 
   /* HERO */
   .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 0 60px; text-align: center; position: relative; }
 
-  .hero-eyebrow { font-family: 'Caveat', cursive; font-size: 20px; color: var(--crimson); font-weight: 700; letter-spacing: 3px; margin-bottom: 12px; transform: rotate(-1.5deg); display: block; }
+  .hero-eyebrow { font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 20px; color: var(--crimson); font-weight: 700; letter-spacing: 3px; margin-bottom: 12px; transform: rotate(-1.5deg); display: block; }
 
   /* Main title — stacked NPAT letters */
   .hero-title-block { position: relative; display: inline-block; margin-bottom: 8px; }
@@ -77,8 +108,8 @@
   .npat-dot { color: var(--ink); font-size: 0.4em; opacity: 0.3; align-self: center; margin-bottom: 12px; }
 
   .hero-full-name {
-    font-family: 'Special Elite', cursive; font-size: clamp(14px, 2.2vw, 22px);
-    color: #888; letter-spacing: 6px; text-transform: uppercase;
+    font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: clamp(14px, 2.2vw, 20px);
+    color: #888; letter-spacing: 5px; text-transform: uppercase;
     margin-top: 4px; display: block;
   }
 
@@ -86,37 +117,49 @@
   .ink-underline path { stroke-dasharray: 700; stroke-dashoffset: 700; animation: draw-ink 1.8s ease forwards 0.4s; }
   @keyframes draw-ink { to { stroke-dashoffset: 0; } }
 
-  .hero-tagline { font-family: 'Special Elite', cursive; font-size: 20px; color: var(--ink); margin: 24px 0 36px; opacity: 0.7; }
+  .hero-tagline { font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 20px; color: var(--ink); margin: 24px 0 36px; opacity: 0.75; }
   .typing-text { border-right: 3px solid var(--cobalt); animation: blink 0.7s step-end infinite; }
   @keyframes blink { 50% { border-color: transparent; } }
 
   /* CTA */
   .cta-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
 
+  /* PLAY NOW — starburst stamp with orange-to-crimson gradient */
   .btn-stamp {
     position: relative; font-family: 'Bangers', cursive; font-size: 30px; letter-spacing: 6px;
-    color: white; background: var(--crimson); border: none; padding: 16px 48px; cursor: none;
-    box-shadow: 0 8px 0 #8b0000, 0 12px 20px rgba(232,0,29,0.4);
-    clip-path: polygon(2% 0%, 98% 0%, 100% 15%, 100% 85%, 98% 100%, 2% 100%, 0% 85%, 0% 15%);
-    transition: transform 0.1s, box-shadow 0.1s; overflow: hidden; text-decoration: none; display: inline-block;
+    color: white; border: none; padding: 18px 52px; cursor: none;
+    background: linear-gradient(135deg, #ff8c00 0%, var(--crimson) 100%);
+    box-shadow: 0 8px 0 #7a1a00, 0 14px 28px rgba(232,80,0,0.45);
+    clip-path: polygon(4% 0%,50% 2%,96% 0%,100% 4%,98% 50%,100% 96%,96% 100%,50% 98%,4% 100%,0% 96%,2% 50%,0% 4%);
+    transition: transform 0.12s, box-shadow 0.12s; overflow: hidden; text-decoration: none; display: inline-block;
+    animation: btn-pulse 2.8s ease-in-out infinite;
   }
-  .btn-stamp::before { content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); transition: left 0.4s; }
+  @keyframes btn-pulse {
+    0%,100% { box-shadow: 0 8px 0 #7a1a00, 0 14px 28px rgba(232,80,0,0.45); }
+    50%      { box-shadow: 0 8px 0 #7a1a00, 0 18px 36px rgba(232,80,0,0.65), 0 0 0 6px rgba(255,140,0,0.18); }
+  }
+  .btn-stamp::before { content: ''; position: absolute; top: 0; left: -100%; width: 55%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); transition: left 0.4s; }
+  .btn-stamp:hover { transform: translateY(-3px) scale(1.04); animation: none; box-shadow: 0 12px 0 #7a1a00, 0 20px 36px rgba(232,80,0,0.6); }
   .btn-stamp:hover::before { left: 150%; }
+  .btn-stamp:active { transform: translateY(4px); box-shadow: 0 3px 0 #7a1a00, 0 6px 10px rgba(232,80,0,0.5); }
   .btn-stamp.slam { animation: stamp-slam 0.3s cubic-bezier(0.36,0.07,0.19,0.97); }
   @keyframes stamp-slam {
-    0% { transform: scale(1.1) translateY(-12px); box-shadow: 0 20px 0 #8b0000, 0 24px 30px rgba(232,0,29,0.5); }
-    60% { transform: scale(0.96) translateY(6px); box-shadow: 0 2px 0 #8b0000, 0 4px 10px rgba(232,0,29,0.6); }
-    80% { transform: scale(1.02) translateY(-2px); }
-    100% { transform: scale(1) translateY(0); box-shadow: 0 8px 0 #8b0000, 0 12px 20px rgba(232,0,29,0.4); }
+    0%  { transform: scale(1.12) translateY(-14px); }
+    60% { transform: scale(0.95) translateY(6px); }
+    80% { transform: scale(1.03) translateY(-2px); }
+    100%{ transform: scale(1) translateY(0); }
   }
 
+  /* HOW IT WORKS — green sticky-note tab */
   .btn-outline {
-    font-family: 'Caveat', cursive; font-size: 20px; font-weight: 700; color: var(--cobalt);
-    background: transparent; border: 3px solid var(--cobalt); padding: 14px 32px; cursor: none;
-    text-decoration: none; display: inline-block; transform: rotate(1deg);
-    transition: background 0.2s, color 0.2s, transform 0.2s;
+    font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 18px; font-weight: 700;
+    color: #0a5c2e; background: #c8f7dc;
+    border: 3px solid #44bb77; padding: 14px 32px; cursor: none;
+    text-decoration: none; display: inline-block; transform: rotate(-1.2deg);
+    box-shadow: 3px 5px 0 rgba(0,0,0,0.14);
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
   }
-  .btn-outline:hover { background: var(--cobalt); color: white; transform: rotate(-1deg) scale(1.04); }
+  .btn-outline:hover { background: #44bb77; color: white; transform: rotate(0.5deg) scale(1.05); box-shadow: 4px 7px 0 rgba(0,0,0,0.18); }
 
   /* STICKERS & DECO */
   .star-sticker { position: absolute; font-size: 36px; filter: drop-shadow(2px 3px 4px rgba(0,0,0,0.25)); animation: wiggle 3s ease-in-out infinite; pointer-events: none; }
@@ -124,20 +167,12 @@
 
   .tape { position: absolute; width: 52px; height: 20px; background: rgba(255,230,0,0.55); border: 1px solid rgba(200,180,0,0.3); border-radius: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
-  .paper-plane { position: absolute; font-size: 40px; animation: fly-plane 9s ease-in-out infinite; pointer-events: none; }
-  @keyframes fly-plane {
-    0% { transform: translate(-80px,20px) rotate(-15deg) scale(0.8); opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { transform: translate(110vw,30px) rotate(10deg) scale(0.9); opacity: 0; }
-  }
-
-  .doodle { position: absolute; opacity: 0.25; pointer-events: none; animation: float-doodle 4s ease-in-out infinite; font-size: 30px; }
-  @keyframes float-doodle { 0%,100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-10px) rotate(5deg); } }
+  /* ── 3-D WIREFRAME BACKGROUND ─────────────────────────────── */
+  #bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 
   /* CATEGORIES */
   .categories { padding: 60px 0 80px; }
-  .section-label { font-family: 'Caveat', cursive; font-size: 18px; color: var(--cobalt); font-weight: 700; letter-spacing: 3px; text-transform: uppercase; text-align: center; margin-bottom: 8px; opacity: 0.6; }
+  .section-label { font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 16px; color: var(--cobalt); font-weight: 700; letter-spacing: 3px; text-transform: uppercase; text-align: center; margin-bottom: 8px; opacity: 0.6; }
   .section-title { font-family: 'Permanent Marker', cursive; font-size: 38px; color: var(--ink); text-align: center; margin-bottom: 48px; transform: rotate(-1deg); display: inline-block; width: 100%; }
   .highlight { background: var(--yellow); padding: 0 8px; display: inline-block; transform: rotate(0.5deg); }
 
@@ -174,9 +209,9 @@
   .card-place .card-title { color: var(--cobalt); }
   .card-animal .card-title { color: var(--green); }
   .card-thing .card-title { color: var(--orange); }
-  .card-desc { font-family: 'Caveat', cursive; font-size: 16px; color: #555; text-align: center; line-height: 1.4; }
+  .card-desc { font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 15px; color: #555; text-align: center; line-height: 1.45; }
   .card-tags { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-  .tag { font-family: 'Special Elite', cursive; font-size: 12px; padding: 3px 8px; border-radius: 2px; font-weight: bold; letter-spacing: 1px; }
+  .tag { font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 12px; padding: 3px 8px; border-radius: 2px; font-weight: 700; letter-spacing: 0.5px; }
   .card-name .tag { background: #ffe0e0; color: var(--crimson); }
   .card-place .tag { background: #e0e8ff; color: var(--cobalt); }
   .card-animal .tag { background: #e0ffe8; color: #007a30; }
@@ -193,76 +228,45 @@
   .step:nth-child(3) .step-num { background: var(--green); }
   .step:nth-child(4) .step-num { background: var(--orange); }
   .step-title { font-family: 'Permanent Marker', cursive; font-size: 18px; color: var(--ink); margin-bottom: 6px; }
-  .step-desc { font-family: 'Caveat', cursive; font-size: 15px; color: #555; line-height: 1.4; }
-
-  /* LEADERBOARD */
-  .lb-section { padding: 60px 0 80px; }
-  .corkboard { background: #c9a96e; padding: 32px; max-width: 680px; margin: 40px auto 0; position: relative; box-shadow: inset 0 0 20px rgba(0,0,0,0.2), 0 12px 40px rgba(0,0,0,0.3); border-radius: 4px; transform: rotate(0.5deg); }
-  .corkboard::before { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4'/%3E%3CfeColorMatrix type='matrix' values='0.6 0 0 0 0.5 0 0.4 0 0 0.3 0 0 0.3 0 0.2 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)'/%3E%3C/svg%3E"); opacity: 0.5; border-radius: 4px; }
-  .corkboard-title { font-family: 'Permanent Marker', cursive; font-size: 26px; color: var(--paper); text-align: center; margin-bottom: 24px; position: relative; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
-  .lb-list { list-style: none; display: flex; flex-direction: column; gap: 10px; position: relative; }
-  .lb-item { background: var(--paper); display: flex; align-items: center; padding: 12px 20px; gap: 16px; box-shadow: 2px 4px 8px rgba(0,0,0,0.2); transform: rotate(var(--r,0deg)); transition: transform 0.2s; }
-  .lb-item:hover { transform: rotate(0deg) scale(1.02); }
-  .lb-rank { font-family: 'Bangers', cursive; font-size: 28px; width: 36px; text-align: center; color: var(--ink); }
-  .lb-rank.gold { color: #FFB800; }
-  .lb-rank.silver { color: #999; }
-  .lb-rank.bronze { color: #cd7f32; }
-  .lb-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-  .lb-name { font-family: 'Special Elite', cursive; font-size: 18px; color: var(--ink); flex: 1; }
-  .lb-score { font-family: 'Bangers', cursive; font-size: 24px; color: var(--crimson); }
-
-  /* STATS */
-  .stats { padding: 40px 0 60px; }
-  .stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 32px; max-width: 700px; margin: 32px auto 0; text-align: center; }
-  .stat-num { font-family: 'Bangers', cursive; font-size: 64px; line-height: 1; display: block; }
-  .stat-label { font-family: 'Caveat', cursive; font-size: 18px; color: #666; font-weight: 700; }
-  .stats-grid > :nth-child(1) .stat-num { color: var(--crimson); }
-  .stats-grid > :nth-child(2) .stat-num { color: var(--cobalt); }
-  .stats-grid > :nth-child(3) .stat-num { color: var(--green); }
-
-  /* FINAL CTA */
-  .final-cta { padding: 80px 0 100px; text-align: center; position: relative; }
-  .final-title { font-family: 'Bangers', cursive; font-size: clamp(44px,7vw,72px); color: var(--ink); letter-spacing: 3px; margin-bottom: 12px; transform: rotate(-1deg); display: inline-block; }
-  .final-sub { font-family: 'Caveat', cursive; font-size: 20px; color: #666; margin-bottom: 36px; }
-  .eraser { position: absolute; width: 120px; height: 28px; background: rgba(200,190,180,0.4); border-radius: 50%; filter: blur(4px); transform: rotate(-5deg); pointer-events: none; }
+  .step-desc { font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 15px; color: #555; line-height: 1.45; }
 
   /* REVEAL */
   .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.6s, transform 0.6s; }
   .reveal.visible { opacity: 1; transform: translateY(0); }
 
-  footer { text-align: center; padding: 32px; font-family: 'Caveat', cursive; font-size: 16px; color: #aaa; border-top: 1px solid var(--line-blue); }
+  footer { text-align: center; padding: 32px; font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 15px; color: #aaa; border-top: 1px solid var(--line-blue); }
 
   @media (max-width: 700px) {
-    .page-wrap { padding: 0 16px 0 32px; }
-    .cards-grid, .stats-grid { grid-template-columns: 1fr; }
+    /* Remove the red margin line — it sits at 68px but mobile padding is much smaller */
+    .notebook-bg {
+      background-image: repeating-linear-gradient(transparent, transparent 31px, var(--line-blue) 31px, var(--line-blue) 32px);
+    }
+    .page-wrap { padding: 0 16px; }
+    .hole-punch { display: none; }
+    /* gap must exceed 36px so the ±18px torn-paper edges don't collide when stacked */
+    .cards-grid { grid-template-columns: 1fr; gap: 44px; }
     .steps { grid-template-columns: repeat(2,1fr); }
     .steps::before { display: none; }
-    .hole-punch { left: 6px; width: 18px; height: 18px; }
-    nav ul { gap: 12px; }
-    nav a { font-size: 15px; }
+    nav ul { gap: 10px; }
+    .nav-sticker { font-size: 13px; padding: 5px 12px; }
     .cta-row { flex-direction: column; align-items: center; }
     .btn-stamp, .btn-outline { width: 100%; max-width: 280px; text-align: center; }
     .section-title { font-size: clamp(24px, 6vw, 38px); }
-    .lb-name { font-size: 15px; }
+    /* Floating doodles / plane use absolute/fixed positions that can widen the page */
+    .doodle, .paper-plane { display: none; }
   }
 
   @media (max-width: 480px) {
-    .page-wrap { padding: 0 12px 0 24px; }
-    .hole-punch { display: none; }
-    .npat-letters { gap: 8px; font-size: clamp(60px, 14vw, 100px); }
+    .page-wrap { padding: 0 12px; }
+    /* Lower the minimum so the four letters + dots fit on a 360 px screen */
+    .npat-letters { gap: 6px; font-size: clamp(48px, 14vw, 100px); }
     .npat-dot { font-size: 0.3em; }
     .hero-full-name { font-size: clamp(11px, 2.8vw, 16px); letter-spacing: 4px; }
     .hero-tagline { font-size: 16px; }
     nav { flex-wrap: wrap; gap: 10px; }
     nav ul { flex-wrap: wrap; justify-content: center; gap: 10px; }
     .steps { grid-template-columns: 1fr; }
-    .lb-item { flex-wrap: wrap; gap: 6px; }
-    .stats-grid { grid-template-columns: repeat(3,1fr); gap: 16px; }
-    .stat-num { font-size: 44px; }
-    .stat-label { font-size: 14px; }
-    .corkboard { padding: 20px 16px; }
-    .final-title { font-size: clamp(36px, 8vw, 56px); }
-    .cards-grid { gap: 20px; }
+    .cards-grid { gap: 44px; }
   }
 </style>
 </head>
@@ -288,29 +292,30 @@
 
 <canvas id="trail-canvas"></canvas>
 <div id="cursor">
+  <!-- pencil: tip at top (16,2), eraser cap at bottom — rotated -135deg so tip points upper-left -->
   <svg viewBox="0 0 32 32" fill="none">
-    <rect x="13" y="2" width="6" height="18" rx="1" fill="#FFE600" stroke="#333" stroke-width="1.5"/>
-    <rect x="13" y="18" width="6" height="6" rx="0.5" fill="#f4c878" stroke="#333" stroke-width="1.5"/>
-    <polygon points="13,24 19,24 16,30" fill="#333"/>
-    <rect x="13" y="2" width="6" height="3" rx="1" fill="#aaa" stroke="#333" stroke-width="1"/>
+    <polygon points="13,8 19,8 16,2" fill="#2a2a2a"/>
+    <rect x="13" y="8" width="6" height="14" rx="1" fill="#FFE600" stroke="#333" stroke-width="1.5"/>
+    <rect x="13" y="22" width="6" height="5" rx="0.5" fill="#f4c878" stroke="#333" stroke-width="1.5"/>
+    <rect x="13" y="27" width="6" height="3" rx="1" fill="#bbb" stroke="#333" stroke-width="1"/>
   </svg>
 </div>
 
-<div class="paper-plane" style="top:90px">✈️</div>
-<div class="doodle" style="right:4%;top:620px">🚀</div>
-<div class="doodle" style="right:7%;top:1050px;animation-delay:1s">👑</div>
-<div class="doodle" style="left:2%;top:1450px;transform:rotate(45deg)">🚀</div>
-<div class="doodle" style="left:3%;top:960px;animation-delay:2s">👑</div>
+<!-- 3-D wireframe geometry background -->
+<canvas id="bg-canvas"></canvas>
 
 <!-- HERO -->
 <section class="hero">
   <div class="page-wrap" style="width:100%">
     <nav>
-      <div class="nav-logo">N·P·A·T</div>
+      <a href="index.html" class="nav-logo">
+        <span class="nl nl-n">N</span>
+        <span class="nl nl-p">P</span>
+        <span class="nl nl-a">A</span>
+        <span class="nl nl-t">T</span>
+      </a>
       <ul>
-        <li><a href="#how-to">How to Play</a></li>
-        <li><a href="#leaderboard">Top Players</a></li>
-        <li><a href="game.html">Play Now</a></li>
+        <li><a href="#how-to" class="nav-sticker ns-howto">How to Play</a></li>
       </ul>
     </nav>
 
@@ -424,51 +429,6 @@
   </div>
 </section>
 
-<!-- LEADERBOARD -->
-<section class="lb-section" id="leaderboard">
-  <div class="page-wrap">
-    <p class="section-label">— Hall of Champions —</p>
-    <h2 class="section-title reveal">All-Time <span class="highlight">Legends</span></h2>
-    <div class="corkboard reveal">
-      <h3 class="corkboard-title">📌 CLASS RANKINGS — MAY 2026</h3>
-      <ol class="lb-list">
-        <li class="lb-item" style="--r:-0.8deg"><span class="lb-rank gold">🥇</span><div class="lb-avatar" style="background:#fff3cd">🦁</div><span class="lb-name">WordLion_X</span><span>⭐⭐⭐⭐⭐</span><span class="lb-score">9,840</span></li>
-        <li class="lb-item" style="--r:0.5deg"><span class="lb-rank silver">🥈</span><div class="lb-avatar" style="background:#e8f4ff">🐬</div><span class="lb-name">QuickDolphin</span><span>⭐⭐⭐⭐</span><span class="lb-score">8,210</span></li>
-        <li class="lb-item" style="--r:-0.3deg"><span class="lb-rank bronze">🥉</span><div class="lb-avatar" style="background:#ffe8e8">🦊</div><span class="lb-name">FoxType99</span><span>⭐⭐⭐⭐</span><span class="lb-score">7,450</span></li>
-        <li class="lb-item" style="--r:1deg"><span class="lb-rank" style="color:#666">4</span><div class="lb-avatar" style="background:#e8ffe8">🐸</div><span class="lb-name">JumpFrogger</span><span>⭐⭐⭐</span><span class="lb-score">6,780</span></li>
-        <li class="lb-item" style="--r:-0.6deg"><span class="lb-rank" style="color:#666">5</span><div class="lb-avatar" style="background:#f8e8ff">🦄</div><span class="lb-name">UnicornRush</span><span>⭐⭐⭐</span><span class="lb-score">5,990</span></li>
-      </ol>
-    </div>
-  </div>
-</section>
-
-<!-- STATS -->
-<section class="stats">
-  <div class="page-wrap">
-    <div class="stats-grid">
-      <div class="reveal"><span class="stat-num" data-target="142000">0</span><span class="stat-label">rounds played</span></div>
-      <div class="reveal"><span class="stat-num" data-target="38000">0</span><span class="stat-label">word nerds</span></div>
-      <div class="reveal"><span class="stat-num" data-target="99">0</span><span class="stat-label">% more fun</span></div>
-    </div>
-  </div>
-</section>
-
-<!-- FINAL CTA -->
-<section class="final-cta">
-  <div class="page-wrap">
-    <div class="eraser" style="top:20px;left:30%"></div>
-    <div class="star-sticker" style="top:-20px;left:18%;position:absolute;font-size:40px">⭐</div>
-    <div class="star-sticker" style="top:30px;right:20%;position:absolute;font-size:28px;animation-delay:0.8s">🌟</div>
-    <h2 class="final-title reveal">Your Word.<br>Your Speed.<br>Your Glory.</h2>
-    <p class="final-sub reveal">The clock is ticking. Legends are made in seconds.</p>
-    <div class="cta-row reveal">
-      <a href="game.html" class="btn-stamp" style="font-size:34px;padding:18px 56px">PLAY NOW</a>
-    </div>
-    <p style="font-family:'Caveat',cursive;font-size:15px;color:#aaa;margin-top:20px;font-style:italic">No account needed · Free forever · Up to 8 players</p>
-    <div style="margin-top:28px;font-size:26px;letter-spacing:12px;opacity:0.35">⭐ ⭐ ⭐ ⭐ ⭐</div>
-  </div>
-</section>
-
 <footer>
   <p>Made with ✏️ and too much coffee &nbsp;·&nbsp; <strong>N·P·A·T</strong> — Name Place Animal Thing &nbsp;·&nbsp; © 2026</p>
 </footer>
@@ -519,24 +479,105 @@
   const ro = new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');}),{threshold:0.15});
   document.querySelectorAll('.reveal').forEach(el=>ro.observe(el));
 
-  // Counters
-  const co = new IntersectionObserver(es=>es.forEach(e=>{
-    if(!e.isIntersecting)return;
-    const el=e.target, t=+el.dataset.target; let c=0;
-    const inc=t/60, timer=setInterval(()=>{c+=inc;if(c>=t){c=t;clearInterval(timer);}el.textContent=Math.floor(c).toLocaleString();},25);
-    co.unobserve(el);
-  }),{threshold:0.5});
-  document.querySelectorAll('.stat-num[data-target]').forEach(el=>co.observe(el));
-
   // Card tilt
   document.querySelectorAll('.card').forEach(card=>{
-    const base = getComputedStyle(card).transform;
     card.addEventListener('mousemove',e=>{
       const r=card.getBoundingClientRect(), x=(e.clientX-r.left)/r.width-0.5, y=(e.clientY-r.top)/r.height-0.5;
       card.style.transform=`rotate(${x*4}deg) translateY(-8px) perspective(400px) rotateX(${-y*6}deg)`;
     });
     card.addEventListener('mouseleave',()=>{card.style.transform='';});
   });
+
+  // ── 3-D WIREFRAME BACKGROUND ──────────────────────────────
+  const bgC = document.getElementById('bg-canvas');
+  const bgX = bgC.getContext('2d');
+  function resizeBg(){ bgC.width=window.innerWidth; bgC.height=window.innerHeight; }
+  resizeBg(); window.addEventListener('resize', resizeBg);
+
+  // Build icosahedron edges from vertex distances
+  const PHI = (1+Math.sqrt(5))/2;
+  (function buildGeos(){
+    const icoV=[[-1,PHI,0],[1,PHI,0],[-1,-PHI,0],[1,-PHI,0],[0,-1,PHI],[0,1,PHI],[0,-1,-PHI],[0,1,-PHI],[PHI,0,-1],[PHI,0,1],[-PHI,0,-1],[-PHI,0,1]];
+    const icoE=[];
+    for(let i=0;i<icoV.length;i++) for(let j=i+1;j<icoV.length;j++){
+      const d=(icoV[i][0]-icoV[j][0])**2+(icoV[i][1]-icoV[j][1])**2+(icoV[i][2]-icoV[j][2])**2;
+      if(d<4.1) icoE.push([i,j]);
+    }
+    window._GEO={
+      cube:{v:[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],e:[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]]},
+      octa:{v:[[0,1.4,0],[0,-1.4,0],[1.4,0,0],[-1.4,0,0],[0,0,1.4],[0,0,-1.4]],e:[[0,2],[0,3],[0,4],[0,5],[1,2],[1,3],[1,4],[1,5],[2,4],[4,3],[3,5],[5,2]]},
+      tetra:{v:[[0,1.6,0],[-1.4,-0.8,0.8],[1.4,-0.8,0.8],[0,-0.8,-1.6]],e:[[0,1],[0,2],[0,3],[1,2],[2,3],[3,1]]},
+      ico:{v:icoV,e:icoE}
+    };
+  })();
+
+  const GK = Object.keys(window._GEO);
+  const GCOLS = ['#E8001D','#1A3AFF','#00C44F','#FF6B00'];
+
+  // Parallax mouse
+  let mxBg=0, myBg=0;
+  document.addEventListener('mousemove',e=>{ mxBg=(e.clientX/window.innerWidth-.5); myBg=(e.clientY/window.innerHeight-.5); });
+
+  // Spawn shape instances spread across the screen
+  const shapes = Array.from({length:16},(_,i)=>({
+    geo: GK[i%4],
+    x: (i%4)/3 * window.innerWidth * 0.9 + window.innerWidth*0.05,
+    y: Math.floor(i/4)/3 * window.innerHeight * 0.9 + window.innerHeight*0.05,
+    depth: (Math.random()-.5)*260,          // z-layer for parallax
+    vx:(Math.random()-.5)*0.38,
+    vy:(Math.random()-.5)*0.30,
+    rx:Math.random()*Math.PI*2, ry:Math.random()*Math.PI*2, rz:Math.random()*Math.PI*2,
+    drx:(Math.random()-.5)*0.008,
+    dry:(Math.random()-.5)*0.012,
+    drz:(Math.random()-.5)*0.007,
+    size: 26+Math.random()*54,
+    color: GCOLS[i%4],
+    alpha: 0.08+Math.random()*0.10
+  }));
+
+  function rotV([x,y,z],rx,ry,rz){
+    let y2=y*Math.cos(rx)-z*Math.sin(rx), z2=y*Math.sin(rx)+z*Math.cos(rx); y=y2; z=z2;
+    let x2=x*Math.cos(ry)+z*Math.sin(ry), z3=-x*Math.sin(ry)+z*Math.cos(ry); x=x2; z=z3;
+    return [x*Math.cos(rz)-y*Math.sin(rz), x*Math.sin(rz)+y*Math.cos(rz), z];
+  }
+
+  function drawGeo(s){
+    const def = window._GEO[s.geo];
+    const FOV = 550;
+    // Mouse parallax shifts shapes by different amounts per depth layer
+    const ox = s.x + mxBg * s.depth * 0.06;
+    const oy = s.y + myBg * s.depth * 0.06;
+    const pts = def.v.map(v=>{
+      const [x,y,z] = rotV(v.map(c=>c*s.size), s.rx,s.ry,s.rz);
+      const sc = FOV/(FOV + z + s.depth + 420);
+      return [ox+x*sc, oy+y*sc, z];
+    });
+    // Sort edges by avg z so far edges draw first (painter's algorithm)
+    const edges = def.e.slice().sort((a,b)=>(pts[a[0]][2]+pts[a[1]][2])-(pts[b[0]][2]+pts[b[1]][2]));
+    bgX.strokeStyle = s.color;
+    bgX.lineWidth = 1.3;
+    for(const [a,b] of edges){
+      // Fade near edges further away to enhance depth
+      const zAvg = (pts[a][2]+pts[b][2])/2;
+      bgX.globalAlpha = s.alpha * (0.5 + 0.5*((zAvg+s.size)/(s.size*2+0.001)));
+      bgX.beginPath(); bgX.moveTo(pts[a][0],pts[a][1]); bgX.lineTo(pts[b][0],pts[b][1]); bgX.stroke();
+    }
+  }
+
+  function animBg(){
+    bgX.clearRect(0,0,bgC.width,bgC.height);
+    const W=bgC.width, H=bgC.height;
+    for(const s of shapes){
+      s.rx+=s.drx; s.ry+=s.dry; s.rz+=s.drz;
+      s.x+=s.vx; s.y+=s.vy;
+      if(s.x<-160) s.x=W+160; else if(s.x>W+160) s.x=-160;
+      if(s.y<-160) s.y=H+160; else if(s.y>H+160) s.y=-160;
+      drawGeo(s);
+    }
+    bgX.globalAlpha=1;
+    requestAnimationFrame(animBg);
+  }
+  animBg();
 </script>
 </body>
 </html>
