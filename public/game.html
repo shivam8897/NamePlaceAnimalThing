@@ -860,9 +860,14 @@
       <span class="ev-timer-label">s to evaluate</span>
     </div>
 
-    <p class="ev-hint">✓ Valid is the default — only mark ✗ Invalid if an answer is wrong. Scores reveal when time's up.</p>
+    <p class="ev-hint">✓ Valid is the default — only mark ✗ Invalid if an answer is wrong. Scores reveal when everyone's done.</p>
 
     <div class="ev-players" id="ev-players"></div>
+
+    <div style="text-align:center;margin-top:20px;display:flex;align-items:center;justify-content:center;gap:14px">
+      <button class="btn-done-sc" id="btn-eval-done" onclick="markEvalDone()">✓ I'M DONE</button>
+      <span class="done-count-label" id="eval-done-count" style="display:none"></span>
+    </div>
   </div>
 </div>
 
@@ -903,10 +908,7 @@
       <ul class="lb-list" id="sc-lb"></ul>
     </div>
 
-    <div class="next-row" id="bottom-next-row" style="align-items:center;gap:14px">
-      <button class="btn-done-sc" id="btn-done" style="display:none" onclick="markScoringDone()">✓ I'M DONE</button>
-      <span class="done-count-label" id="done-count" style="display:none"></span>
-    </div>
+    <div class="next-row" id="bottom-next-row"></div>
   </div>
 </div>
 
@@ -1170,10 +1172,10 @@ function connect() {
     myVotes.clear();
     document.getElementById('ch-banner').style.display='none';
     document.getElementById('auto-bar').style.display='none';
-    const doneBtn = document.getElementById('btn-done');
-    if (doneBtn) { doneBtn.style.display='none'; doneBtn.disabled=false; doneBtn.textContent="✓ I'M DONE"; }
-    const doneCnt = document.getElementById('done-count');
-    if (doneCnt) { doneCnt.style.display='none'; doneCnt.textContent=''; }
+    const evalDoneBtn = document.getElementById('btn-eval-done');
+    if (evalDoneBtn) { evalDoneBtn.disabled=false; evalDoneBtn.textContent="✓ I'M DONE"; }
+    const evalDoneCnt = document.getElementById('eval-done-count');
+    if (evalDoneCnt) { evalDoneCnt.style.display='none'; evalDoneCnt.textContent=''; }
     show('game'); initGame(d.round,d.maxRounds,d.letter,d.timeLeft);
   });
   s.on('timer:tick', ({timeLeft}) => {
@@ -1186,8 +1188,8 @@ function connect() {
   s.on('evaluation:start', d => { show('evaluation'); renderEvaluation(d); });
   s.on('evaluation:tick',  ({timeLeft}) => tickEvalTimer(timeLeft));
   s.on('round:end', d => { show('scoring'); renderScoring(d); });
-  s.on('scoring:done:update', ({ doneCount, totalPlayers }) => {
-    const el = document.getElementById('done-count');
+  s.on('evaluation:done:update', ({ doneCount, totalPlayers }) => {
+    const el = document.getElementById('eval-done-count');
     if (el) { el.style.display = 'inline'; el.textContent = `${doneCount}/${totalPlayers} ready`; }
   });
   s.on('auto:advance', ({seconds}) => startAutoBar(seconds));
@@ -1320,10 +1322,10 @@ function tickAutoBar(secs) {
   prog.style.background=secs<=10?'var(--r)':secs<=20?'var(--o)':'var(--b)';
 }
 function nextRound() { S.socket.emit('round:next',{code:S.code}); }
-function markScoringDone() {
-  const btn = document.getElementById('btn-done');
+function markEvalDone() {
+  const btn = document.getElementById('btn-eval-done');
   if (btn) { btn.disabled = true; btn.textContent = '✓ Waiting...'; }
-  S.socket.emit('scoring:done', { code: S.code });
+  S.socket.emit('evaluation:done', { code: S.code });
 }
 
 // ── Evaluation ────────────────────────────────────────────────
@@ -1444,11 +1446,6 @@ function renderScoring({scores,leaderboard,round,maxRounds,isLastRound}) {
   document.getElementById('sc-meta').textContent=`Letter ${S.letter} — Round ${round}/${maxRounds}`;
   document.getElementById('sc-tbody').innerHTML=buildScoreTable(scores);
   renderLB('sc-lb',leaderboard);
-  // Done button — show for all players unless last round
-  const doneBtn   = document.getElementById('btn-done');
-  const doneCount = document.getElementById('done-count');
-  if (doneBtn)   { doneBtn.style.display = isLastRound ? 'none' : 'inline-block'; doneBtn.disabled = false; doneBtn.textContent = "✓ I'M DONE"; }
-  if (doneCount) { doneCount.style.display = 'none'; doneCount.textContent = ''; }
   if (isLastRound) { document.getElementById('auto-bar').style.display='none'; }
 }
 

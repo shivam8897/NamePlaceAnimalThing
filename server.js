@@ -95,7 +95,7 @@ function makeRoom(hostId, hostName, hostAvatar, opts = {}) {
     roundScores: null, autoCount: 0,
     answerVotes: new Map(), // key:`${pid}_${field}` → { up:Set, down:Set }
     evalData: {}, evalTimer: null, evalTimeLeft: 0,
-    scoringDone: new Set(),
+    evalDone: new Set(),
   };
   rooms.set(code, room);
   return room;
@@ -245,7 +245,7 @@ function startRound(room) {
   room.roundScores = null;
   room.answerVotes  = new Map();
   room.evalData     = {};
-  room.scoringDone  = new Set();
+  room.evalDone     = new Set();
   clearInterval(room.evalTimer);
   room.timeLeft = room.roundTime;
   room.roundStartTime = Date.now();
@@ -438,17 +438,17 @@ io.on('connection', (socket) => {
     if (room.round < room.maxRounds) startRound(room);
   });
 
-  socket.on('scoring:done', ({ code }) => {
+  socket.on('evaluation:done', ({ code }) => {
     const room = rooms.get(code);
-    if (!room || room.state !== 'scoring') return;
-    if (room.scoringDone.has(socket.id)) return;
-    room.scoringDone.add(socket.id);
-    const doneCount    = room.scoringDone.size;
+    if (!room || room.state !== 'evaluating') return;
+    if (room.evalDone.has(socket.id)) return;
+    room.evalDone.add(socket.id);
+    const doneCount    = room.evalDone.size;
     const totalPlayers = room.players.size;
-    io.to(code).emit('scoring:done:update', { doneCount, totalPlayers });
+    io.to(code).emit('evaluation:done:update', { doneCount, totalPlayers });
     if (doneCount >= totalPlayers) {
-      clearInterval(room.autoTimer);
-      if (room.round < room.maxRounds) startRound(room);
+      clearInterval(room.evalTimer);
+      finalizeEvaluation(room);
     }
   });
 
@@ -475,7 +475,7 @@ io.on('connection', (socket) => {
     room.players.forEach(p => { p.score = 0; });
     room.round = 0; room.state = 'waiting';
     room.usedLetters = []; room.submissions.clear(); room.submissionOrder = [];
-    room.scoringDone = new Set();
+    room.evalDone = new Set();
     clearInterval(room.timer); clearInterval(room.autoTimer); clearInterval(room.evalTimer);
     io.to(code).emit('room:restarted', publicRoom(room));
     if (room.isPublic) io.emit('rooms:updated');
@@ -508,14 +508,14 @@ io.on('connection', (socket) => {
         if (room.submissions.size >= room.players.size) endRound(room);
       }
 
-      if (room.state === 'scoring') {
-        room.scoringDone.delete(socket.id);
-        const doneCount    = room.scoringDone.size;
+      if (room.state === 'evaluating') {
+        room.evalDone.delete(socket.id);
+        const doneCount    = room.evalDone.size;
         const totalPlayers = room.players.size;
-        io.to(code).emit('scoring:done:update', { doneCount, totalPlayers });
+        io.to(code).emit('evaluation:done:update', { doneCount, totalPlayers });
         if (doneCount >= totalPlayers) {
-          clearInterval(room.autoTimer);
-          if (room.round < room.maxRounds) startRound(room);
+          clearInterval(room.evalTimer);
+          finalizeEvaluation(room);
         }
       }
 
