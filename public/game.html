@@ -588,6 +588,19 @@
   }
 
 
+  /* ── SCORING DONE BUTTON ─────────────────────────────── */
+  .btn-done-sc {
+    font-family:'Bangers',cursive; font-size:20px; letter-spacing:3px; color:white;
+    background:var(--g); border:none; padding:11px 28px; cursor:pointer;
+    box-shadow:0 4px 0 #007a30; transition:transform .12s,box-shadow .12s;
+    clip-path:polygon(2% 0%,98% 0%,100% 15%,100% 85%,98% 100%,2% 100%,0% 85%,0% 15%);
+    touch-action:manipulation;
+  }
+  .btn-done-sc:hover  { transform:translateY(-2px); box-shadow:0 6px 0 #007a30; }
+  .btn-done-sc:active { transform:translateY(3px);  box-shadow:0 1px 0 #007a30; }
+  .btn-done-sc:disabled { background:#aaa; box-shadow:0 3px 0 #666; cursor:not-allowed; transform:none; }
+  .done-count-label { font-family:'Caveat',cursive; font-size:16px; color:#888; font-weight:700; }
+
   .ch-banner {
     border-radius:3px; padding:11px 16px; margin-bottom:14px;
     display:none; align-items:center; gap:10px; flex-wrap:wrap;
@@ -849,7 +862,7 @@
       <span class="ev-timer-label">s to evaluate</span>
     </div>
 
-    <p class="ev-hint">📋 Mark each answer below — your own are skipped. Scores reveal when time's up.</p>
+    <p class="ev-hint">✓ Valid is the default — only mark ✗ Invalid if an answer is wrong. Scores reveal when time's up.</p>
 
     <div class="ev-players" id="ev-players"></div>
   </div>
@@ -892,8 +905,9 @@
       <ul class="lb-list" id="sc-lb"></ul>
     </div>
 
-    <div class="next-row" id="bottom-next-row">
-      <button class="btn-out" id="wait-next" style="display:none" disabled>Host starting next round...</button>
+    <div class="next-row" id="bottom-next-row" style="align-items:center;gap:14px">
+      <button class="btn-done-sc" id="btn-done" style="display:none" onclick="markScoringDone()">✓ I'M DONE</button>
+      <span class="done-count-label" id="done-count" style="display:none"></span>
     </div>
   </div>
 </div>
@@ -1157,6 +1171,11 @@ function connect() {
     TOTAL = d.roundTime || 30; S.roundTime = TOTAL;
     myVotes.clear();
     document.getElementById('ch-banner').style.display='none';
+    document.getElementById('auto-bar').style.display='none';
+    const doneBtn = document.getElementById('btn-done');
+    if (doneBtn) { doneBtn.style.display='none'; doneBtn.disabled=false; doneBtn.textContent="✓ I'M DONE"; }
+    const doneCnt = document.getElementById('done-count');
+    if (doneCnt) { doneCnt.style.display='none'; doneCnt.textContent=''; }
     show('game'); initGame(d.round,d.maxRounds,d.letter,d.timeLeft);
   });
   s.on('timer:tick', ({timeLeft}) => {
@@ -1169,6 +1188,10 @@ function connect() {
   s.on('evaluation:start', d => { show('evaluation'); renderEvaluation(d); });
   s.on('evaluation:tick',  ({timeLeft}) => tickEvalTimer(timeLeft));
   s.on('round:end', d => { show('scoring'); renderScoring(d); });
+  s.on('scoring:done:update', ({ doneCount, totalPlayers }) => {
+    const el = document.getElementById('done-count');
+    if (el) { el.style.display = 'inline'; el.textContent = `${doneCount}/${totalPlayers} ready`; }
+  });
   s.on('auto:advance', ({seconds}) => startAutoBar(seconds));
   s.on('auto:tick',    ({seconds}) => tickAutoBar(seconds));
   s.on('game:over',    d => { show('gameover'); renderGameOver(d.leaderboard); launchConfetti(d.leaderboard); });
@@ -1291,7 +1314,6 @@ function startAutoBar(secs) {
   prog.style.width=(secs/AUTO_TOTAL*100)+'%';
   document.getElementById('auto-count').textContent=secs;
   document.getElementById('btn-next').style.display=S.isHost?'inline-block':'none';
-  document.getElementById('wait-next').style.display=S.isHost?'none':'inline-block';
 }
 function tickAutoBar(secs) {
   document.getElementById('auto-count').textContent=secs;
@@ -1300,6 +1322,11 @@ function tickAutoBar(secs) {
   prog.style.background=secs<=10?'var(--r)':secs<=20?'var(--o)':'var(--b)';
 }
 function nextRound() { S.socket.emit('round:next',{code:S.code}); }
+function markScoringDone() {
+  const btn = document.getElementById('btn-done');
+  if (btn) { btn.disabled = true; btn.textContent = '✓ Waiting...'; }
+  S.socket.emit('scoring:done', { code: S.code });
+}
 
 // ── Evaluation ────────────────────────────────────────────────
 let _evalTotal = 60;
@@ -1426,7 +1453,12 @@ function renderScoring({scores,leaderboard,round,maxRounds,isLastRound}) {
   document.getElementById('sc-meta').textContent=`Letter ${S.letter} — Round ${round}/${maxRounds}`;
   document.getElementById('sc-tbody').innerHTML=buildScoreTable(scores);
   renderLB('sc-lb',leaderboard);
-  if(isLastRound){document.getElementById('auto-bar').style.display='none';document.getElementById('wait-next').style.display='none';}
+  // Done button — show for all players unless last round
+  const doneBtn   = document.getElementById('btn-done');
+  const doneCount = document.getElementById('done-count');
+  if (doneBtn)   { doneBtn.style.display = isLastRound ? 'none' : 'inline-block'; doneBtn.disabled = false; doneBtn.textContent = "✓ I'M DONE"; }
+  if (doneCount) { doneCount.style.display = 'none'; doneCount.textContent = ''; }
+  if (isLastRound) { document.getElementById('auto-bar').style.display='none'; }
 }
 
 

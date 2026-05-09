@@ -114,6 +114,7 @@ function makeRoom(hostId, hostName, hostAvatar, opts = {}) {
     answerVotes: new Map(), // key:`${pid}_${field}` → { up:Set, down:Set }
     dictStatus:  {},        // `${pid}_${field}` → true|false|null
     evalData: {}, evalTimer: null, evalTimeLeft: 0,
+    scoringDone: new Set(),
   };
   rooms.set(code, room);
   return room;
@@ -265,6 +266,7 @@ function startRound(room) {
   room.answerVotes  = new Map();
   room.dictStatus   = {};
   room.evalData     = {};
+  room.scoringDone  = new Set();
   clearInterval(room.evalTimer);
   room.timeLeft = room.roundTime;
   room.roundStartTime = Date.now();
@@ -470,6 +472,20 @@ io.on('connection', (socket) => {
     if (room.round < room.maxRounds) startRound(room);
   });
 
+  socket.on('scoring:done', ({ code }) => {
+    const room = rooms.get(code);
+    if (!room || room.state !== 'scoring') return;
+    if (room.scoringDone.has(socket.id)) return;
+    room.scoringDone.add(socket.id);
+    const doneCount    = room.scoringDone.size;
+    const totalPlayers = room.players.size;
+    io.to(code).emit('scoring:done:update', { doneCount, totalPlayers });
+    if (doneCount >= totalPlayers) {
+      clearInterval(room.autoTimer);
+      if (room.round < room.maxRounds) startRound(room);
+    }
+  });
+
   // Evaluation voting — records votes during the 60s evaluation phase
   socket.on('vote:answer', ({ code, targetPid, field, invalid }) => {
     const room = rooms.get(code);
@@ -493,6 +509,7 @@ io.on('connection', (socket) => {
     room.players.forEach(p => { p.score = 0; });
     room.round = 0; room.state = 'waiting';
     room.usedLetters = []; room.submissions.clear(); room.submissionOrder = [];
+    room.scoringDone = new Set();
     clearInterval(room.timer); clearInterval(room.autoTimer); clearInterval(room.evalTimer);
     io.to(code).emit('room:restarted', publicRoom(room));
     if (room.isPublic) io.emit('rooms:updated');
@@ -523,6 +540,17 @@ io.on('connection', (socket) => {
         room.submissions.set(socket.id, { name:'', place:'', animal:'', thing:'', submittedAt: Date.now() });
         room.submissionOrder.push(socket.id);
         if (room.submissions.size >= room.players.size) endRound(room);
+      }
+
+      if (room.state === 'scoring') {
+        room.scoringDone.delete(socket.id);
+        const doneCount    = room.scoringDone.size;
+        const totalPlayers = room.players.size;
+        io.to(code).emit('scoring:done:update', { doneCount, totalPlayers });
+        if (doneCount >= totalPlayers) {
+          clearInterval(room.autoTimer);
+          if (room.round < room.maxRounds) startRound(room);
+        }
       }
 
       if (room.isPublic && room.state === 'waiting') io.emit('rooms:updated');
