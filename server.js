@@ -1,14 +1,24 @@
-const express = require('express');
-const http = require('http');
+require('dotenv').config();
+const express    = require('express');
+const http       = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
-const crypto = require('crypto');
+const path       = require('path');
+const crypto     = require('crypto');
+const compression = require('compression');
+const { createClient } = require('@supabase/supabase-js');
 
-const app = express();
+const app    = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io     = new Server(server, { cors: { origin: '*' } });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Supabase — only active once .env is configured
+const supabase = (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY)
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
+  : null;
+if (!supabase) console.warn('[Supabase] Not configured — competitive scores will not be saved.');
+
+app.use(compression());
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h', etag: true }));
 app.use(express.json());
 
 // ─── Config ──────────────────────────────────────────────────
@@ -80,13 +90,14 @@ function makeRoom(hostId, hostName, hostAvatar, opts = {}) {
   const roundTime = TIMER_OPTIONS.includes(+opts.timer)   ? +opts.timer   : DEFAULT_ROUND_TIME;
   const maxRounds = ROUND_OPTIONS.includes(+opts.rounds)  ? +opts.rounds  : DEFAULT_ROUNDS;
   const maxPlayers= Math.min(8, Math.max(2, parseInt(opts.maxPlayers) || DEFAULT_MAX));
-  const isPublic  = opts.isPublic !== false;
+  const isPublic      = opts.isPublic !== false;
+  const isCompetitive = !!opts.isCompetitive;
 
   const room = {
     code, host: hostId,
-    players: new Map([[hostId, { name: hostName, score: 0, avatar: hostAvatar || '🦁' }]]),
+    players: new Map([[hostId, { name: hostName, score: 0, avatar: hostAvatar || '🦁', country: opts.country || '', playerId: opts.playerId || null }]]),
     state: 'waiting',
-    round: 0, maxRounds, maxPlayers, roundTime, isPublic,
+    round: 0, maxRounds, maxPlayers, roundTime, isPublic, isCompetitive,
     letter: null, usedLetters: [],
     timer: null, autoTimer: null,
     timeLeft: roundTime, roundStartTime: null,
@@ -106,7 +117,7 @@ function publicRoom(room) {
     code: room.code, state: room.state,
     round: room.round, maxRounds: room.maxRounds,
     maxPlayers: room.maxPlayers, roundTime: room.roundTime,
-    isPublic: room.isPublic,
+    isPublic: room.isPublic, isCompetitive: room.isCompetitive || false,
     letter: room.letter, timeLeft: room.timeLeft, host: room.host,
     players: Array.from(room.players.entries()).map(([id, p]) => ({
       id, name: p.name, score: p.score, avatar: p.avatar || '🦁',
@@ -319,6 +330,7 @@ function finalizeEvaluation(room) {
   });
 
   if (isLast) {
+    if (room.isCompetitive) saveCompetitiveScores(room, lb);
     setTimeout(() => { room.state = 'gameover'; io.to(room.code).emit('game:over', { leaderboard: lb }); }, 10000);
     return;
   }
@@ -330,6 +342,25 @@ function finalizeEvaluation(room) {
     io.to(room.code).emit('auto:tick', { seconds: room.autoCount });
     if (room.autoCount <= 0) { clearInterval(room.autoTimer); if (room.state === 'scoring') startRound(room); }
   }, 1000);
+}
+
+// ─── Supabase: save scores after a competitive game ends ─────
+async function saveCompetitiveScores(room, lb) {
+  if (!supabase) return;
+  try {
+    for (const entry of lb) {
+      const player = room.players.get(entry.id);
+      if (!player?.playerId) continue;
+      await supabase.from('players').upsert(
+        { id: player.playerId, username: player.name, country: player.country || '' },
+        { onConflict: 'id' }
+      );
+      await supabase.from('match_results').insert({ player_id: player.playerId, score: entry.score });
+    }
+    console.log(`[Supabase] Saved ${lb.length} competitive scores for room ${room.code}`);
+  } catch (e) {
+    console.error('[Supabase] Error saving scores:', e.message);
+  }
 }
 
 // ─── Smart join — fills most-populated public rooms first ────
@@ -389,6 +420,36 @@ io.on('connection', (socket) => {
     best.players.set(socket.id, { name, score: 0, avatar: avatar || '🦁' });
     socket.join(best.code);
     socket.emit('room:joined', { isHost: false, ...publicRoom(best) });
+    socket.to(best.code).emit('room:update', publicRoom(best));
+    io.emit('rooms:updated');
+  });
+
+  // Competitive mode: fixed settings, random matchmaking, scores saved to Supabase
+  socket.on('room:competitive-join', ({ name, avatar, country, playerId }) => {
+    name    = (name    || '').trim();
+    country = (country || '').trim();
+    if (!name) return socket.emit('err', 'Name is required');
+
+    const COMP = { isPublic: true, maxPlayers: 8, rounds: 10, timer: 30, isCompetitive: true };
+
+    const best = Array.from(rooms.values())
+      .filter(r => r.isCompetitive && r.state === 'waiting' && r.players.size < r.maxPlayers)
+      .sort((a, b) => (b.players.size / b.maxPlayers) - (a.players.size / a.maxPlayers))[0] || null;
+
+    if (!best) {
+      const room = makeRoom(socket.id, name, avatar || '🦁', { ...COMP, country, playerId });
+      socket.join(room.code);
+      socket.emit('room:joined', { isHost: true, isCompetitive: true, ...publicRoom(room) });
+      io.emit('rooms:updated');
+      return;
+    }
+
+    if (Array.from(best.players.values()).some(p => p.name.toLowerCase() === name.toLowerCase()))
+      return socket.emit('err', 'That name is taken in this room. Try another name.');
+
+    best.players.set(socket.id, { name, score: 0, avatar: avatar || '🦁', country, playerId: playerId || null });
+    socket.join(best.code);
+    socket.emit('room:joined', { isHost: false, isCompetitive: true, ...publicRoom(best) });
     socket.to(best.code).emit('room:update', publicRoom(best));
     io.emit('rooms:updated');
   });
@@ -537,6 +598,22 @@ app.get('/api/room/:code', (req, res) => {
   const room = rooms.get(req.params.code.toUpperCase());
   if (!room) return res.status(404).json({ error: 'Not found' });
   res.json(publicRoom(room));
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=30'); // leaderboard cache: 30 seconds
+  if (!supabase) return res.json([]);
+  try {
+    const country = (req.query.country || '').trim();
+    let query = supabase.from('leaderboard').select('*').order('rank').limit(50);
+    if (country) query = query.ilike('country', `%${country}%`);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    console.error('[Supabase] leaderboard error:', e.message);
+    res.status(500).json({ error: 'Could not load leaderboard' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
