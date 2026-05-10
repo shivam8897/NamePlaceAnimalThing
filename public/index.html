@@ -20,7 +20,8 @@
     --margin-red: #ff8fa0;
   }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }
+  input, textarea { user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; }
   body { background-color: var(--paper); font-family: 'Comic Neue', 'Comic Sans MS', cursive; overflow-x: hidden; cursor: none; }
 
   /* tip at (16,2); after rotate(-135deg) it lands at (6.1,25.9) → translate(-6,-26) aligns tip to mouse */
@@ -267,6 +268,34 @@
     nav ul { flex-wrap: wrap; justify-content: center; gap: 10px; }
     .steps { grid-template-columns: 1fr; }
     .cards-grid { gap: 44px; }
+  }
+
+  /* === MARKER PRESSURE PRESS EFFECT === */
+  .btn-stamp, .btn-outline, .nav-sticker, .card {
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.08s, border-color 0.08s, border-width 0.08s !important;
+  }
+  .btn-stamp.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(4px) scale(0.97) !important;
+    box-shadow: 0 1px 0 #4a0e00, 0 2px 5px rgba(100,20,0,0.35) !important;
+    animation: none !important;
+  }
+  .btn-outline.pressed {
+    border-color: #0d4a22 !important;
+    border-width: 4px !important;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.08) !important;
+    transform: rotate(-0.5deg) translateY(2px) scale(0.97) !important;
+    filter: brightness(0.8) !important;
+  }
+  .nav-sticker.pressed {
+    filter: brightness(0.78) !important;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.06) !important;
+    transform: translateY(2px) scale(0.97) !important;
+  }
+  .card.pressed {
+    filter: brightness(0.96) !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important;
   }
 </style>
 </head>
@@ -578,6 +607,31 @@
     requestAnimationFrame(animBg);
   }
   animBg();
+
+  // === MARKER PRESSURE PRESS EFFECT ===
+  function applyPress(el) {
+    el._origFilter    = el.style.filter;
+    el._origOutline   = el.style.outline;
+    el._origTransform = el.style.transform;
+    el._origShadow    = el.style.boxShadow;
+    el.style.filter    = 'brightness(0.72)';
+    el.style.outline   = '3px solid #993C1D';
+    el.style.transform = (el._origTransform || '') + ' translateY(2px) scale(0.97)';
+    el.style.boxShadow = '0 1px 0 #4a0e00';
+  }
+  function releasePress(el) {
+    el.style.filter    = el._origFilter    || '';
+    el.style.outline   = el._origOutline   || '';
+    el.style.transform = el._origTransform || '';
+    el.style.boxShadow = el._origShadow    || '';
+  }
+  document.querySelectorAll('.btn-stamp, .btn-outline, .nav-sticker, .card').forEach(el => {
+    el.addEventListener('mousedown',  () => applyPress(el));
+    el.addEventListener('mouseup',    () => releasePress(el));
+    el.addEventListener('mouseleave', () => releasePress(el));
+    el.addEventListener('touchstart', () => applyPress(el),   { passive: true });
+    el.addEventListener('touchend',   () => releasePress(el), { passive: true });
+  });
 </script>
 </body>
 </html>

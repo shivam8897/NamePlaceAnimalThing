@@ -11,7 +11,8 @@
     --r:#E8001D; --b:#1A3AFF; --g:#00C44F; --o:#FF6B00; --y:#FFE600;
     --ink:#1a1a2e; --paper:#faf6ee; --line:#b8d4f0; --margin:#ff8fa0;
   }
-  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; }
+  input, textarea { user-select:text; -webkit-user-select:text; -moz-user-select:text; -ms-user-select:text; }
   html { scroll-behavior:smooth; }
   body {
     background:var(--paper); font-family:'Patrick Hand',cursive;
@@ -622,6 +623,59 @@
   @media (max-width:360px) {
     .av-emoji { font-size:20px; }
     .av-name  { display:none; }
+  }
+
+  /* === MARKER PRESSURE PRESS EFFECT === */
+  .btn-red, .btn-blue, .btn-out, .btn-sub, .btn-done-sc,
+  .btn-refresh, .btn-qj, .btn-join-g, .btn-join-b, .back, .code-box, .field {
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.08s,
+                border-color 0.08s, border-width 0.08s !important;
+  }
+  .btn-red.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(3px) !important;
+    box-shadow: 0 1px 0 #8b0000 !important;
+  }
+  .btn-blue.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(3px) !important;
+    box-shadow: 0 1px 0 #0a1a9a !important;
+  }
+  .btn-sub.pressed, .btn-done-sc.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(3px) !important;
+    box-shadow: 0 1px 0 #007a30 !important;
+  }
+  .btn-out.pressed {
+    border-color: #03007a !important;
+    border-width: 4px !important;
+    filter: brightness(0.8) !important;
+    transform: translateY(2px) !important;
+  }
+  .btn-refresh.pressed {
+    border-color: #03007a !important;
+    border-width: 3px !important;
+    filter: brightness(0.8) !important;
+    transform: translateY(1px) !important;
+  }
+  .btn-qj.pressed, .btn-join-g.pressed, .btn-join-b.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(2px) scale(0.97) !important;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.25) !important;
+  }
+  .back.pressed {
+    filter: brightness(0.8) !important;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.1) !important;
+    transform: rotate(0deg) translateY(2px) !important;
+  }
+  .code-box.pressed {
+    filter: brightness(0.88) !important;
+    transform: rotate(0deg) scale(0.97) translateY(2px) !important;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.1) !important;
+  }
+  .field.pressed {
+    border-bottom-color: var(--r) !important;
+    border-bottom-width: 4px !important;
   }
 </style>
 </head>
@@ -1596,6 +1650,37 @@ function stopConfetti() {
   }
   animBg();
 })();
+
+// === MARKER PRESSURE PRESS EFFECT ===
+function applyPress(el) {
+  el._origFilter    = el.style.filter;
+  el._origOutline   = el.style.outline;
+  el._origTransform = el.style.transform;
+  el._origShadow    = el.style.boxShadow;
+  el.style.filter    = 'brightness(0.68)';
+  el.style.outline   = '3px solid #7a1a00';
+  el.style.transform = (el._origTransform || '') + ' translateY(2px) scale(0.97)';
+  el.style.boxShadow = '0 1px 0 rgba(0,0,0,0.4)';
+}
+function releasePress(el) {
+  el.style.filter    = el._origFilter    || '';
+  el.style.outline   = el._origOutline   || '';
+  el.style.transform = el._origTransform || '';
+  el.style.boxShadow = el._origShadow    || '';
+}
+function bindPress(el) {
+  if (el.dataset.pb) return;
+  el.dataset.pb = '1';
+  el.addEventListener('mousedown',  () => applyPress(el));
+  el.addEventListener('mouseup',    () => releasePress(el));
+  el.addEventListener('mouseleave', () => releasePress(el));
+  el.addEventListener('touchstart', () => applyPress(el),   { passive: true });
+  el.addEventListener('touchend',   () => releasePress(el), { passive: true });
+}
+const PRESS_SEL = '.btn-red,.btn-blue,.btn-out,.btn-sub,.btn-done-sc,.btn-refresh,.btn-qj,.btn-join-g,.btn-join-b,.back,.code-box,.field,.av-card';
+document.querySelectorAll(PRESS_SEL).forEach(bindPress);
+new MutationObserver(() => document.querySelectorAll(PRESS_SEL).forEach(bindPress))
+  .observe(document.body, { childList: true, subtree: true });
 </script>
 </body>
 </html>
