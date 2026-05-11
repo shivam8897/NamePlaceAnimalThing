@@ -3,7 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>N·P·A·T — Name Place Animal Thing</title>
+<title>N·P·A·T — Name Place Animal Thing | Free Multiplayer Word Game</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<meta name="description" content="N·P·A·T is a free real-time multiplayer word game. Race to name a person, place, animal and thing for a random letter — before anyone else does. Compete globally and climb the leaderboard!">
+<meta name="keywords" content="name place animal thing, NPAT, word game, multiplayer word game, online word game, free word game">
+<meta property="og:title" content="N·P·A·T — Name Place Animal Thing">
+<meta property="og:description" content="Race to name a person, place, animal and thing for a random letter. Free real-time multiplayer word game — play now!">
+<meta property="og:type" content="website">
+<meta property="og:image" content="favicon.svg">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="N·P·A·T — Name Place Animal Thing">
+<meta name="twitter:description" content="Free real-time multiplayer word game. Race to fill Name, Place, Animal & Thing before anyone else!">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"N·P·A·T — Name Place Animal Thing","description":"Real-time multiplayer word game where players race to name a person, place, animal and thing for a random letter","applicationCategory":"Game","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Bangers&family=Comic+Neue:wght@400;700&display=swap');
 
@@ -20,11 +33,18 @@
     --margin-red: #ff8fa0;
   }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }
+  input, textarea { user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; }
   body { background-color: var(--paper); font-family: 'Comic Neue', 'Comic Sans MS', cursive; overflow-x: hidden; cursor: none; }
 
   /* tip at (16,2); after rotate(-135deg) it lands at (6.1,25.9) → translate(-6,-26) aligns tip to mouse */
-  #cursor { position: fixed; width: 32px; height: 32px; pointer-events: none; z-index: 9999; transform: translate(-6px, -26px) rotate(-135deg); }
+  #cursor { position: fixed; width: 32px; height: 32px; pointer-events: none; z-index: 9999; transform: translate(-6px, -26px) rotate(-135deg); transition: transform 0.08s ease; }
+  #cursor.cursor--pointer { transform: translate(-2px, -2px); }
+  #cursor.cursor--pressed { transform: translate(-6px, -26px) rotate(-135deg) scale(0.85); }
+  #cursor.cursor--pointer.cursor--pressed { transform: translate(-2px, -2px) scale(0.85); }
+  .cursor-plane { display: none; }
+  #cursor.cursor--pointer .cursor-pencil { display: none; }
+  #cursor.cursor--pointer .cursor-plane { display: block; }
   #trail-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9998; opacity: 0.35; }
 
   .notebook-bg {
@@ -82,6 +102,58 @@
     background: #c8f7dc; color: #0a5c2e;
     border-color: #44bb77; transform: rotate(1.5deg);
   }
+  .ns-lb {
+    background: #fff0b0; color: #7a4800;
+    border-color: #e6a800; transform: rotate(1deg);
+  }
+
+  /* LEADERBOARD SECTION */
+  .lb-section { padding: 80px 0 60px; }
+  .lb-board {
+    max-width: 760px; margin: 0 auto;
+    background: #fffdf5;
+    border: 2px solid #d4c090;
+    border-radius: 4px;
+    box-shadow: 5px 5px 0 #c4a870, 10px 10px 0 rgba(196,168,112,.22);
+    overflow: hidden;
+  }
+  .lb-head {
+    background: var(--ink); color: white;
+    padding: 18px 24px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  }
+  .lb-head-title { font-family: 'Bangers', cursive; font-size: 24px; letter-spacing: 3px; }
+  .lb-head-sub { font-size: 12px; opacity: 0.6; margin-top: 2px; }
+  .lb-filter-inp {
+    font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 14px;
+    padding: 6px 12px; border: 2px solid rgba(255,255,255,.25);
+    background: rgba(255,255,255,.12); color: white; border-radius: 4px; outline: none;
+    width: 180px;
+  }
+  .lb-filter-inp::placeholder { color: rgba(255,255,255,.45); }
+  .lb-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 11px 22px; border-bottom: 1px solid #e8d8b0;
+    font-family: 'Comic Neue', 'Comic Sans MS', cursive;
+    transition: background .12s;
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-row:hover { background: rgba(255,230,0,.08); }
+  .lb-row.r1 { background: #fffae0; }
+  .lb-row.r2 { background: #f7f7f7; }
+  .lb-row.r3 { background: #fff4ea; }
+  .lb-medal { font-family: 'Bangers', cursive; font-size: 20px; width: 34px; text-align: center; flex-shrink: 0; }
+  .lb-flag  { font-size: 22px; flex-shrink: 0; line-height: 1; }
+  .lb-info  { flex: 1; min-width: 0; }
+  .lb-uname { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lb-ctry  { font-size: 11px; color: #999; margin-top: 1px; }
+  .lb-right { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+  .lb-pts   { font-family: 'Bangers', cursive; font-size: 22px; color: var(--ink); letter-spacing: 1px; }
+  .lb-meta  { font-size: 11px; color: #bbb; }
+  .lb-empty-state { text-align: center; padding: 60px 20px; color: #bbb; font-family: 'Comic Neue', 'Comic Sans MS', cursive; }
+  .lb-empty-ico   { font-size: 44px; margin-bottom: 10px; }
+  .lb-empty-txt   { font-size: 15px; }
+  .lb-spinner     { text-align: center; padding: 40px; color: #ccc; font-family: 'Comic Neue', 'Comic Sans MS', cursive; }
 
   /* HERO */
   .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 0 60px; text-align: center; position: relative; }
@@ -268,6 +340,34 @@
     .steps { grid-template-columns: 1fr; }
     .cards-grid { gap: 44px; }
   }
+
+  /* === MARKER PRESSURE PRESS EFFECT === */
+  .btn-stamp, .btn-outline, .nav-sticker, .card {
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.08s, border-color 0.08s, border-width 0.08s !important;
+  }
+  .btn-stamp.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(4px) scale(0.97) !important;
+    box-shadow: 0 1px 0 #4a0e00, 0 2px 5px rgba(100,20,0,0.35) !important;
+    animation: none !important;
+  }
+  .btn-outline.pressed {
+    border-color: #0d4a22 !important;
+    border-width: 4px !important;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.08) !important;
+    transform: rotate(-0.5deg) translateY(2px) scale(0.97) !important;
+    filter: brightness(0.8) !important;
+  }
+  .nav-sticker.pressed {
+    filter: brightness(0.78) !important;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.06) !important;
+    transform: translateY(2px) scale(0.97) !important;
+  }
+  .card.pressed {
+    filter: brightness(0.96) !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important;
+  }
 </style>
 </head>
 <body>
@@ -293,11 +393,23 @@
 <canvas id="trail-canvas"></canvas>
 <div id="cursor">
   <!-- pencil: tip at top (16,2), eraser cap at bottom — rotated -135deg so tip points upper-left -->
-  <svg viewBox="0 0 32 32" fill="none">
+  <svg class="cursor-pencil" viewBox="0 0 32 32" fill="none">
     <polygon points="13,8 19,8 16,2" fill="#2a2a2a"/>
     <rect x="13" y="8" width="6" height="14" rx="1" fill="#FFE600" stroke="#333" stroke-width="1.5"/>
     <rect x="13" y="22" width="6" height="5" rx="0.5" fill="#f4c878" stroke="#333" stroke-width="1.5"/>
     <rect x="13" y="27" width="6" height="3" rx="1" fill="#bbb" stroke="#333" stroke-width="1"/>
+  </svg>
+  <!-- paper plane: nose at (2,2) pointing upper-left — shown when hovering interactive elements -->
+  <svg class="cursor-plane" viewBox="0 0 32 32" fill="none">
+    <!-- upper wing: nose at (2,2) -->
+    <path d="M2,2 L30,11 L17,17 Z" fill="#FFE600" stroke="#2a2a2a" stroke-width="1.3" stroke-linejoin="round"/>
+    <!-- lower flap -->
+    <path d="M2,2 L17,17 L10,28 Z" fill="#e8d000" stroke="#2a2a2a" stroke-width="1.3" stroke-linejoin="round"/>
+    <!-- fold crease -->
+    <line x1="2" y1="2" x2="17" y2="17" stroke="#2a2a2a" stroke-width="0.8" stroke-linecap="round" opacity="0.3"/>
+    <!-- motion dots behind the tail -->
+    <circle cx="25" cy="7" r="1.3" fill="#2a2a2a" opacity="0.18"/>
+    <circle cx="29" cy="5" r="0.8" fill="#2a2a2a" opacity="0.12"/>
   </svg>
 </div>
 
@@ -316,6 +428,7 @@
       </a>
       <ul>
         <li><a href="#how-to" class="nav-sticker ns-howto">How to Play</a></li>
+        <li><a href="#leaderboard" class="nav-sticker ns-lb">🏆 Leaderboard</a></li>
       </ul>
     </nav>
 
@@ -429,6 +542,27 @@
   </div>
 </section>
 
+<!-- LEADERBOARD -->
+<section class="lb-section" id="leaderboard">
+  <div class="page-wrap">
+    <p class="section-label">— Competitive Rankings —</p>
+    <h2 class="section-title reveal">🏆 Global <span class="highlight">Leaderboard</span></h2>
+    <p style="text-align:center;color:#888;font-size:15px;margin-bottom:32px">
+      Only <strong>Competitive</strong> match scores count here. Play to climb!
+    </p>
+    <div class="lb-board reveal">
+      <div class="lb-head">
+        <div>
+          <div class="lb-head-title">🏆 TOP PLAYERS WORLDWIDE</div>
+          <div class="lb-head-sub">Updated every 30 seconds</div>
+        </div>
+        <input class="lb-filter-inp" id="lb-filter" type="text" placeholder="🌍 Filter by country..." maxlength="30">
+      </div>
+      <div id="lb-body"><div class="lb-spinner">Loading leaderboard...</div></div>
+    </div>
+  </div>
+</section>
+
 <footer>
   <p>Made with ✏️ and too much coffee &nbsp;·&nbsp; <strong>N·P·A·T</strong> — Name Place Animal Thing &nbsp;·&nbsp; © 2026</p>
 </footer>
@@ -440,17 +574,30 @@
   const ctx = canvas.getContext('2d');
   canvas.width = window.innerWidth; canvas.height = window.innerHeight;
   window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+  // Track mouse press state
+  let isPressed = false;
+  document.addEventListener('mousedown', () => { isPressed = true; cursor.classList.add('cursor--pressed'); });
+  document.addEventListener('mouseup',   () => { isPressed = false; cursor.classList.remove('cursor--pressed'); });
+
+  // Swap to hand cursor on interactive elements (event delegation handles dynamic DOM)
+  const INTERACTIVE = 'button, a, input, select, textarea, [role="button"], label';
+  document.addEventListener('mouseover', e => { if (e.target.closest(INTERACTIVE)) cursor.classList.add('cursor--pointer'); });
+  document.addEventListener('mouseout',  e => { if (e.target.closest(INTERACTIVE)) cursor.classList.remove('cursor--pointer'); });
+
   let trail = [];
   document.addEventListener('mousemove', e => {
     cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px';
-    trail.push({ x: e.clientX, y: e.clientY, age: 0, color: `hsl(${Math.random()>0.6?220:Math.random()>0.5?0:45},80%,50%)` });
+    trail.push({ x: e.clientX, y: e.clientY, age: 0, pressed: isPressed, color: `hsl(${Math.random()>0.6?220:Math.random()>0.5?0:45},80%,50%)` });
     if (trail.length > 60) trail.shift();
   });
   (function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     for (let i=1;i<trail.length;i++) {
       const p=trail[i], pp=trail[i-1]; p.age++;
-      const a=Math.max(0,1-p.age/60), w=Math.max(0.5,(1-p.age/60)*2.5);
+      const a=Math.max(0,1-p.age/60);
+      const maxW = p.pressed ? 7 : 2.5;
+      const w=Math.max(0.5,(1-p.age/60)*maxW);
       ctx.beginPath(); ctx.moveTo(pp.x,pp.y); ctx.lineTo(p.x,p.y);
       ctx.strokeStyle=p.color.replace('hsl','hsla').replace(')',`,${a})`);
       ctx.lineWidth=w; ctx.lineCap='round'; ctx.stroke();
@@ -487,6 +634,76 @@
     });
     card.addEventListener('mouseleave',()=>{card.style.transform='';});
   });
+
+  // ── Leaderboard ─────────────────────────────────────────────
+  const COUNTRY_MAP = {
+    'india':'IN','united states':'US','usa':'US','america':'US','u.s.a.':'US',
+    'united kingdom':'GB','uk':'GB','england':'GB','britain':'GB','scotland':'GB','wales':'GB',
+    'australia':'AU','canada':'CA','germany':'DE','france':'FR','japan':'JP',
+    'china':'CN','brazil':'BR','spain':'ES','italy':'IT','mexico':'MX',
+    'russia':'RU','south korea':'KR','korea':'KR','netherlands':'NL',
+    'sweden':'SE','norway':'NO','denmark':'DK','finland':'FI',
+    'switzerland':'CH','austria':'AT','belgium':'BE','portugal':'PT',
+    'poland':'PL','turkey':'TR','indonesia':'ID','pakistan':'PK',
+    'bangladesh':'BD','nigeria':'NG','egypt':'EG','south africa':'ZA',
+    'kenya':'KE','ghana':'GH','argentina':'AR','colombia':'CO',
+    'chile':'CL','peru':'PE','thailand':'TH','vietnam':'VN',
+    'malaysia':'MY','singapore':'SG','philippines':'PH',
+    'new zealand':'NZ','ireland':'IE','ukraine':'UA','greece':'GR',
+    'romania':'RO','czechia':'CZ','czech republic':'CZ','hungary':'HU',
+    'croatia':'HR','israel':'IL','saudi arabia':'SA',
+    'uae':'AE','united arab emirates':'AE','iran':'IR','nepal':'NP',
+    'sri lanka':'LK','taiwan':'TW','hong kong':'HK',
+  };
+  function flag(country) {
+    const code = COUNTRY_MAP[(country||'').toLowerCase().trim()];
+    if (!code) return '🌍';
+    return [...code].map(c=>String.fromCodePoint(0x1F1E6+c.charCodeAt(0)-65)).join('');
+  }
+  function esc(s){ return (s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+
+  let _lbAll = [], _lbFilter = '';
+  const MEDALS = ['🥇','🥈','🥉'];
+  const ROW_CLS = ['r1','r2','r3'];
+
+  function renderLB() {
+    const body = document.getElementById('lb-body');
+    const data = _lbFilter
+      ? _lbAll.filter(p=>(p.country||'').toLowerCase().includes(_lbFilter.toLowerCase()))
+      : _lbAll;
+    if (!data.length) {
+      body.innerHTML = `<div class="lb-empty-state"><div class="lb-empty-ico">${_lbFilter?'🔍':'🎮'}</div><div class="lb-empty-txt">${_lbFilter?'No players from this country yet':'No competitive matches yet — be the first!'}</div></div>`;
+      return;
+    }
+    body.innerHTML = data.map((p,i)=>`
+      <div class="lb-row ${i<3?ROW_CLS[i]:''}">
+        <div class="lb-medal">${i<3?MEDALS[i]:`#${p.rank}`}</div>
+        <div class="lb-flag">${flag(p.country)}</div>
+        <div class="lb-info">
+          <div class="lb-uname">${esc(p.username)}</div>
+          ${p.country?`<div class="lb-ctry">${esc(p.country)}</div>`:''}
+        </div>
+        <div class="lb-right">
+          <div class="lb-pts">${Number(p.total_score).toLocaleString()} <span style="font-size:14px;font-family:'Comic Neue',cursive;letter-spacing:0">pts</span></div>
+          <div class="lb-meta">${p.matches} match${p.matches===1?'':'es'} · best ${p.best_score}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  async function loadLB() {
+    try {
+      const r = await fetch('/api/leaderboard');
+      if (!r.ok) throw new Error(r.status);
+      _lbAll = await r.json();
+      renderLB();
+    } catch(e) {
+      document.getElementById('lb-body').innerHTML = `<div class="lb-empty-state"><div class="lb-empty-ico">⚠️</div><div class="lb-empty-txt">Could not load leaderboard</div></div>`;
+    }
+  }
+
+  document.getElementById('lb-filter').addEventListener('input', e => { _lbFilter = e.target.value; renderLB(); });
+  loadLB();
+  setInterval(loadLB, 30000);
 
   // ── 3-D WIREFRAME BACKGROUND ──────────────────────────────
   const bgC = document.getElementById('bg-canvas');
@@ -578,6 +795,31 @@
     requestAnimationFrame(animBg);
   }
   animBg();
+
+  // === MARKER PRESSURE PRESS EFFECT ===
+  function applyPress(el) {
+    el._origFilter    = el.style.filter;
+    el._origOutline   = el.style.outline;
+    el._origTransform = el.style.transform;
+    el._origShadow    = el.style.boxShadow;
+    el.style.filter    = 'brightness(0.72)';
+    el.style.outline   = '3px solid #993C1D';
+    el.style.transform = (el._origTransform || '') + ' translateY(2px) scale(0.97)';
+    el.style.boxShadow = '0 1px 0 #4a0e00';
+  }
+  function releasePress(el) {
+    el.style.filter    = el._origFilter    || '';
+    el.style.outline   = el._origOutline   || '';
+    el.style.transform = el._origTransform || '';
+    el.style.boxShadow = el._origShadow    || '';
+  }
+  document.querySelectorAll('.btn-stamp, .btn-outline, .nav-sticker, .card').forEach(el => {
+    el.addEventListener('mousedown',  () => applyPress(el));
+    el.addEventListener('mouseup',    () => releasePress(el));
+    el.addEventListener('mouseleave', () => releasePress(el));
+    el.addEventListener('touchstart', () => applyPress(el),   { passive: true });
+    el.addEventListener('touchend',   () => releasePress(el), { passive: true });
+  });
 </script>
 </body>
 </html>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- dark rounded-square background -->
+  <rect width="32" height="32" rx="7" fill="#1a1a2e"/>
+  <!-- paper plane pointing upper-right, nose ~(27,5) -->
+  <path d="M3,17 L27,5 L19,27 L13,19 Z" fill="#FFE600" stroke="#FFE600" stroke-width="0.4" stroke-linejoin="round"/>
+  <!-- darker fold panel -->
+  <path d="M13,19 L17,13 L27,5 Z" fill="#c8a800" stroke="#c8a800" stroke-width="0.3" stroke-linejoin="round"/>
+  <!-- fold crease -->
+  <line x1="13" y1="19" x2="27" y2="5" stroke="#1a1a2e" stroke-width="0.7" opacity="0.4"/>
+</svg>

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Name Place Animal Thing — Play</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Caveat:wght@400;700&family=Special+Elite&family=Bangers&family=Patrick+Hand&display=swap');
 
@@ -11,7 +12,8 @@
     --r:#E8001D; --b:#1A3AFF; --g:#00C44F; --o:#FF6B00; --y:#FFE600;
     --ink:#1a1a2e; --paper:#faf6ee; --line:#b8d4f0; --margin:#ff8fa0;
   }
-  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; }
+  input, textarea { user-select:text; -webkit-user-select:text; -moz-user-select:text; -ms-user-select:text; }
   html { scroll-behavior:smooth; }
   body {
     background:var(--paper); font-family:'Patrick Hand',cursive;
@@ -434,8 +436,9 @@
   .menu-btn:hover { transform:translateX(3px); }
   .mb-create { background:var(--b); color:white; box-shadow:0 4px 0 #0a1a9a; }
   .mb-browse { background:var(--g); color:white; box-shadow:0 4px 0 #007a30; }
-  .mb-quick  { background:var(--o); color:white; box-shadow:0 4px 0 #c04400; }
+  .mb-comp   { background:linear-gradient(135deg,#FFD700 0%,#FF8C00 100%); color:var(--ink); box-shadow:0 4px 0 #b85f00; }
   .mb-code   { background:white; color:var(--ink); box-shadow:0 4px 0 rgba(0,0,0,.12); border:2px solid #ddd; clip-path:none; }
+  .ri-comp   { background:var(--ink); color:#FFD700; border-color:#444; }
 
   /* ── CREATE ──────────────────────────────────────────── */
   .create-card { max-width:460px; width:100%; padding:28px 24px 40px; box-shadow:0 6px 28px rgba(0,0,0,.1); }
@@ -623,6 +626,70 @@
     .av-emoji { font-size:20px; }
     .av-name  { display:none; }
   }
+
+  /* === MARKER PRESSURE PRESS EFFECT === */
+  .btn-red, .btn-blue, .btn-out, .btn-sub, .btn-done-sc,
+  .btn-refresh, .btn-qj, .btn-join-g, .btn-join-b, .back, .code-box, .field {
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.08s,
+                border-color 0.08s, border-width 0.08s !important;
+  }
+  .btn-red.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(3px) !important;
+    box-shadow: 0 1px 0 #8b0000 !important;
+  }
+  .btn-blue.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(3px) !important;
+    box-shadow: 0 1px 0 #0a1a9a !important;
+  }
+  .btn-sub.pressed, .btn-done-sc.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(3px) !important;
+    box-shadow: 0 1px 0 #007a30 !important;
+  }
+  .btn-out.pressed {
+    border-color: #03007a !important;
+    border-width: 4px !important;
+    filter: brightness(0.8) !important;
+    transform: translateY(2px) !important;
+  }
+  .btn-refresh.pressed {
+    border-color: #03007a !important;
+    border-width: 3px !important;
+    filter: brightness(0.8) !important;
+    transform: translateY(1px) !important;
+  }
+  .btn-qj.pressed, .btn-join-g.pressed, .btn-join-b.pressed {
+    filter: brightness(0.74) !important;
+    transform: translateY(2px) scale(0.97) !important;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.25) !important;
+  }
+  .back.pressed {
+    filter: brightness(0.8) !important;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.1) !important;
+    transform: rotate(0deg) translateY(2px) !important;
+  }
+  .code-box.pressed {
+    filter: brightness(0.88) !important;
+    transform: rotate(0deg) scale(0.97) translateY(2px) !important;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.1) !important;
+  }
+  .field.pressed {
+    border-bottom-color: var(--r) !important;
+    border-bottom-width: 4px !important;
+  }
+
+  /* ── CURSOR ────────────────────────────────────────────── */
+  *, *::before, *::after { cursor: none !important; }
+  #cursor-g { position:fixed; width:32px; height:32px; pointer-events:none; z-index:9999; transform:translate(-6px,-26px) rotate(-135deg); transition:transform 0.08s ease; }
+  #cursor-g.cursor--pointer { transform:translate(-2px,-2px); }
+  #cursor-g.cursor--pressed { transform:translate(-6px,-26px) rotate(-135deg) scale(0.85); }
+  #cursor-g.cursor--pointer.cursor--pressed { transform:translate(-2px,-2px) scale(0.85); }
+  .cursor-plane { display:none; }
+  #cursor-g.cursor--pointer .cursor-pencil { display:none; }
+  #cursor-g.cursor--pointer .cursor-plane  { display:block; }
+  #trail-canvas-g { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9998; opacity:0.35; }
 </style>
 </head>
 <body>
@@ -640,6 +707,24 @@
 <!-- CONFETTI CANVAS -->
 <canvas id="confetti-canvas"></canvas>
 
+<!-- CURSOR -->
+<canvas id="trail-canvas-g"></canvas>
+<div id="cursor-g">
+  <svg class="cursor-pencil" viewBox="0 0 32 32" fill="none">
+    <polygon points="13,8 19,8 16,2" fill="#2a2a2a"/>
+    <rect x="13" y="8" width="6" height="14" rx="1" fill="#FFE600" stroke="#333" stroke-width="1.5"/>
+    <rect x="13" y="22" width="6" height="5" rx="0.5" fill="#f4c878" stroke="#333" stroke-width="1.5"/>
+    <rect x="13" y="27" width="6" height="3" rx="1" fill="#bbb" stroke="#333" stroke-width="1"/>
+  </svg>
+  <svg class="cursor-plane" viewBox="0 0 32 32" fill="none">
+    <path d="M2,2 L30,11 L17,17 Z" fill="#FFE600" stroke="#2a2a2a" stroke-width="1.3" stroke-linejoin="round"/>
+    <path d="M2,2 L17,17 L10,28 Z" fill="#e8d000" stroke="#2a2a2a" stroke-width="1.3" stroke-linejoin="round"/>
+    <line x1="2" y1="2" x2="17" y2="17" stroke="#2a2a2a" stroke-width="0.8" stroke-linecap="round" opacity="0.3"/>
+    <circle cx="25" cy="7" r="1.3" fill="#2a2a2a" opacity="0.18"/>
+    <circle cx="29" cy="5" r="0.8" fill="#2a2a2a" opacity="0.12"/>
+  </svg>
+</div>
+
 <!-- ── PROFILE ──────────────────────────────────────────────── -->
 <div class="screen active" id="screen-profile">
   <a href="index.html" class="back">← Home</a>
@@ -655,6 +740,27 @@
     <div style="margin-bottom:6px">
       <label class="lbl">Your Name</label>
       <input class="field" id="inp-name" type="text" placeholder="e.g. WordNinja" maxlength="20" autocomplete="off">
+    </div>
+
+    <div style="margin-bottom:6px">
+      <label class="lbl">Country <span style="font-size:12px;opacity:0.5;font-weight:400">(required for Competitive)</span></label>
+      <input class="field" id="inp-country" type="text" placeholder="e.g. India, USA, UK" maxlength="30" autocomplete="off" list="country-datalist">
+      <datalist id="country-datalist">
+        <option value="India"><option value="USA"><option value="United Kingdom">
+        <option value="Australia"><option value="Canada"><option value="Germany">
+        <option value="France"><option value="Japan"><option value="Brazil">
+        <option value="Spain"><option value="Italy"><option value="Mexico">
+        <option value="Russia"><option value="South Korea"><option value="Netherlands">
+        <option value="Sweden"><option value="Pakistan"><option value="Bangladesh">
+        <option value="Nigeria"><option value="South Africa"><option value="Indonesia">
+        <option value="Philippines"><option value="Malaysia"><option value="Singapore">
+        <option value="New Zealand"><option value="Ireland"><option value="Turkey">
+        <option value="Ukraine"><option value="Argentina"><option value="Colombia">
+        <option value="Thailand"><option value="Vietnam"><option value="Egypt">
+        <option value="Saudi Arabia"><option value="UAE"><option value="Kenya">
+        <option value="Ghana"><option value="Nepal"><option value="Sri Lanka">
+        <option value="Israel"><option value="Greece"><option value="Poland">
+      </datalist>
     </div>
 
     <label class="lbl" style="margin-top:14px">Choose Your Character</label>
@@ -682,8 +788,8 @@
     <button class="menu-btn mb-browse" onclick="startBrowse()">
       <span class="mb-ico">🔍</span> BROWSE ROOMS
     </button>
-    <button class="menu-btn mb-quick" onclick="quickJoin()">
-      <span class="mb-ico">⚡</span> QUICK JOIN
+    <button class="menu-btn mb-comp" onclick="competitiveJoin()">
+      <span class="mb-ico">🏆</span> COMPETITIVE
     </button>
     <button class="menu-btn mb-code" onclick="openCodeJoin()">
       <span class="mb-ico">🔑</span> JOIN WITH CODE
@@ -919,6 +1025,11 @@
     <h1 class="go-title">GAME OVER!</h1>
     <div class="winner-stamp"><span id="winner-name">—</span></div>
     <p class="winner-sub" id="winner-sub"></p>
+    <div id="comp-score-badge" style="display:none;margin:10px 0">
+      <span style="background:var(--b);color:white;font-family:'Bangers',cursive;font-size:15px;letter-spacing:2px;padding:7px 18px;border-radius:4px;display:inline-block;box-shadow:0 3px 0 #0a1a9a">
+        🌐 SCORES SAVED TO GLOBAL LEADERBOARD
+      </span>
+    </div>
     <div class="emoji-row">🎉 🎊 ⭐ 🌟 🎈</div>
 
     <div class="cork final-cork">
@@ -975,10 +1086,24 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+// ── Player identity (persists across sessions via localStorage) ──
+function getPlayerId() {
+  let id = localStorage.getItem('npat_player_id');
+  if (!id) {
+    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8); return v.toString(16);
+    });
+    localStorage.setItem('npat_player_id', id);
+  }
+  return id;
+}
+
 // ── State ─────────────────────────────────────────────────────
 const S = {
-  socket:null, myId:null, myName:'', myAvatar:'🦁',
+  socket:null, myId:null, myName:'', myAvatar:'🦁', myCountry:'',
+  myPlayerId: getPlayerId(),
   code:null, isHost:false, letter:null, round:0, submitted:false, roundTime:30,
+  isCompetitive: false,
 };
 let _currentScores = null;
 const myVotes = new Map(); // key:`${pid}_${field}` → 'valid'|'invalid' (evaluation phase)
@@ -1032,6 +1157,7 @@ function continueToMenu() {
   const n = document.getElementById('inp-name').value.trim();
   if (!n) { document.getElementById('profile-err').textContent = 'Enter your name first!'; return; }
   S.myName = n;
+  S.myCountry = document.getElementById('inp-country').value.trim();
   document.getElementById('profile-err').textContent = '';
   const ch = CHARS.find(c => c.emoji === S.myAvatar) || CHARS[0];
   const big = document.getElementById('menu-av-big');
@@ -1125,6 +1251,14 @@ function confirmCodeJoin() {
   S.socket.emit('room:join',{code,name:S.myName,avatar:S.myAvatar});
 }
 function quickJoin() { stopBrowse(); S.socket.emit('room:quick-join',{name:S.myName,avatar:S.myAvatar}); }
+function competitiveJoin() {
+  if (!S.myCountry) {
+    document.getElementById('join-err').textContent = 'Enter your country on the profile screen to play Competitively.';
+    toast('⚠ Country required for Competitive mode'); return;
+  }
+  stopBrowse();
+  S.socket.emit('room:competitive-join', { name:S.myName, avatar:S.myAvatar, country:S.myCountry, playerId:S.myPlayerId });
+}
 
 document.getElementById('priv-code-inp').addEventListener('keydown', e => { if(e.key==='Enter') confirmPrivateJoin(); });
 document.getElementById('code-join-inp').addEventListener('keydown', e => { if(e.key==='Enter') confirmCodeJoin(); });
@@ -1144,8 +1278,10 @@ function connect() {
   s.on('room:joined', d => {
     stopBrowse();
     S.code=d.code; S.isHost=d.isHost||d.host===s.id;
+    S.isCompetitive = d.isCompetitive || false;
     show('lobby'); renderLobby(d);
     if(d.quickJoinCreated) toast('No open rooms — created a new one! Share the code.');
+    if(S.isCompetitive) toast('🏆 Competitive room — scores will be saved globally!');
   });
   s.on('room:update',   d => renderLobby(d));
   s.on('player:joined', d => { renderLobby(d); toast(d.name+' joined! 👋'); });
@@ -1208,7 +1344,7 @@ function renderLobby(d) {
   const tl = (d.roundTime||30) >= 60 ? '1 min' : (d.roundTime||30)+'s';
 
   document.getElementById('lobby-info-tags').innerHTML = `
-    <span class="ri-tag ${d.isPublic?'ri-pub':'ri-priv'}">${d.isPublic?'🌍 Public':'🔒 Private'}</span>
+    ${d.isCompetitive ? '<span class="ri-tag ri-comp">🏆 Competitive</span>' : `<span class="ri-tag ${d.isPublic?'ri-pub':'ri-priv'}">${d.isPublic?'🌍 Public':'🔒 Private'}</span>`}
     <span class="ri-tag ri-rnd">📝 ${d.maxRounds} rounds</span>
     <span class="ri-tag ri-tmr">⏱ ${tl}/round</span>
     <span class="ri-tag ri-plr">👥 ${d.players.length}/${d.maxPlayers}</span>
@@ -1468,6 +1604,7 @@ function renderGameOver(lb) {
   document.getElementById('winner-sub').textContent=isMe?`${winner.score} points — you absolutely crushed it!`:`${esc(winner.name)} dominates with ${winner.score} points`;
   renderLB('final-lb',lb);
   document.getElementById('btn-again').style.display=S.isHost?'inline-block':'none';
+  document.getElementById('comp-score-badge').style.display = S.isCompetitive ? 'block' : 'none';
 }
 function playAgain() { S.socket.emit('room:restart',{code:S.code}); }
 
@@ -1595,6 +1732,74 @@ function stopConfetti() {
     requestAnimationFrame(animBg);
   }
   animBg();
+})();
+
+// === MARKER PRESSURE PRESS EFFECT ===
+function applyPress(el) {
+  el._origFilter    = el.style.filter;
+  el._origOutline   = el.style.outline;
+  el._origTransform = el.style.transform;
+  el._origShadow    = el.style.boxShadow;
+  el.style.filter    = 'brightness(0.68)';
+  el.style.outline   = '3px solid #7a1a00';
+  el.style.transform = (el._origTransform || '') + ' translateY(2px) scale(0.97)';
+  el.style.boxShadow = '0 1px 0 rgba(0,0,0,0.4)';
+}
+function releasePress(el) {
+  el.style.filter    = el._origFilter    || '';
+  el.style.outline   = el._origOutline   || '';
+  el.style.transform = el._origTransform || '';
+  el.style.boxShadow = el._origShadow    || '';
+}
+function bindPress(el) {
+  if (el.dataset.pb) return;
+  el.dataset.pb = '1';
+  el.addEventListener('mousedown',  () => applyPress(el));
+  el.addEventListener('mouseup',    () => releasePress(el));
+  el.addEventListener('mouseleave', () => releasePress(el));
+  el.addEventListener('touchstart', () => applyPress(el),   { passive: true });
+  el.addEventListener('touchend',   () => releasePress(el), { passive: true });
+}
+const PRESS_SEL = '.btn-red,.btn-blue,.btn-out,.btn-sub,.btn-done-sc,.btn-refresh,.btn-qj,.btn-join-g,.btn-join-b,.back,.code-box,.field,.av-card';
+document.querySelectorAll(PRESS_SEL).forEach(bindPress);
+new MutationObserver(() => document.querySelectorAll(PRESS_SEL).forEach(bindPress))
+  .observe(document.body, { childList: true, subtree: true });
+
+// ── CURSOR + TRAIL ────────────────────────────────────────
+(function(){
+  const cur = document.getElementById('cursor-g');
+  const cnv = document.getElementById('trail-canvas-g');
+  const ctx = cnv.getContext('2d');
+  cnv.width = window.innerWidth; cnv.height = window.innerHeight;
+  window.addEventListener('resize', () => { cnv.width = window.innerWidth; cnv.height = window.innerHeight; });
+
+  let pressed = false;
+  document.addEventListener('mousedown', () => { pressed = true;  cur.classList.add('cursor--pressed'); });
+  document.addEventListener('mouseup',   () => { pressed = false; cur.classList.remove('cursor--pressed'); });
+
+  const IA = 'button, a, input, select, textarea, [role="button"], label';
+  document.addEventListener('mouseover', e => { if (e.target.closest(IA)) cur.classList.add('cursor--pointer'); });
+  document.addEventListener('mouseout',  e => { if (e.target.closest(IA)) cur.classList.remove('cursor--pointer'); });
+
+  let trail = [];
+  document.addEventListener('mousemove', e => {
+    cur.style.left = e.clientX + 'px'; cur.style.top = e.clientY + 'px';
+    trail.push({ x: e.clientX, y: e.clientY, age: 0, pressed,
+      color: `hsl(${Math.random()>0.6?220:Math.random()>0.5?0:45},80%,50%)` });
+    if (trail.length > 60) trail.shift();
+  });
+  (function draw() {
+    ctx.clearRect(0, 0, cnv.width, cnv.height);
+    for (let i = 1; i < trail.length; i++) {
+      const p = trail[i], pp = trail[i-1]; p.age++;
+      const a = Math.max(0, 1 - p.age/60);
+      const w = Math.max(0.5, (1 - p.age/60) * (p.pressed ? 7 : 2.5));
+      ctx.beginPath(); ctx.moveTo(pp.x, pp.y); ctx.lineTo(p.x, p.y);
+      ctx.strokeStyle = p.color.replace('hsl','hsla').replace(')', `,${a})`);
+      ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
+    }
+    requestAnimationFrame(draw);
+  })();
 })();
 </script>
 </body>
