@@ -72,11 +72,20 @@ ALTER TABLE match_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE funny_words   ENABLE ROW LEVEL SECURITY;
 
 -- Public read
+DROP POLICY IF EXISTS "public read players"     ON players;
+DROP POLICY IF EXISTS "public read results"     ON match_results;
+DROP POLICY IF EXISTS "public read funny_words" ON funny_words;
 CREATE POLICY "public read players"      ON players       FOR SELECT USING (true);
 CREATE POLICY "public read results"      ON match_results FOR SELECT USING (true);
 CREATE POLICY "public read funny_words"  ON funny_words   FOR SELECT USING (true);
 
 -- Write policies (server uses anon key; no auth required for these operations)
+DROP POLICY IF EXISTS "insert players"     ON players;
+DROP POLICY IF EXISTS "update players"     ON players;
+DROP POLICY IF EXISTS "insert results"     ON match_results;
+DROP POLICY IF EXISTS "update results"     ON match_results;
+DROP POLICY IF EXISTS "insert funny_words" ON funny_words;
+DROP POLICY IF EXISTS "delete funny_words" ON funny_words;
 CREATE POLICY "insert players"       ON players       FOR INSERT WITH CHECK (true);
 CREATE POLICY "update players"       ON players       FOR UPDATE USING (true);
 CREATE POLICY "insert results"       ON match_results FOR INSERT WITH CHECK (true);
