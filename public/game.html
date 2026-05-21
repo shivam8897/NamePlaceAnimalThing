@@ -794,7 +794,7 @@
 </div>
 
 <!-- ── PROFILE ──────────────────────────────────────────────── -->
-<div class="screen active" id="screen-profile">
+<div class="screen" id="screen-profile">
   <a href="index.html" class="back">← Home</a>
   <div class="torn profile-card">
     <div class="logo-row">
@@ -811,7 +811,7 @@
     </div>
 
     <div style="margin-bottom:6px">
-      <label class="lbl">Country <span style="font-size:12px;opacity:0.5;font-weight:400">(required for Competitive)</span></label>
+      <label class="lbl">Country <span style="font-size:12px;opacity:0.5;font-weight:400">(optional — needed for Competitive)</span></label>
       <div class="country-wrap">
         <input class="field" id="inp-country" type="text" placeholder="Type to search country..." maxlength="40" autocomplete="off">
         <div class="country-dd" id="country-dd"></div>
@@ -851,15 +851,16 @@
       <span class="mb-ico">🔑</span> JOIN WITH CODE
     </button>
     <p class="err" id="join-err"></p>
+    <button id="btn-logout" onclick="doLogout()" style="display:none;background:none;border:none;font-family:'Caveat',cursive;font-size:14px;color:#aaa;cursor:pointer;margin-top:10px;text-decoration:underline;">Log out</button>
   </div>
 </div>
 
 <!-- ── AUTH ─────────────────────────────────────────────────── -->
-<div class="screen" id="screen-auth">
-  <a href="#" class="back" onclick="show('menu');return false">← Back</a>
+<div class="screen active" id="screen-auth">
+  <a href="index.html" class="back">← Home</a>
   <div class="torn auth-card">
-    <div class="auth-title">🏆 COMPETITIVE</div>
-    <div class="auth-sub">Sign in to play ranked matches</div>
+    <div class="auth-title">N·P·A·T</div>
+    <div class="auth-sub">Sign in to play — your scores, your rank</div>
     <div class="auth-tabs">
       <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Log In</button>
       <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
@@ -896,7 +897,6 @@
     </div>
 
     <p class="err" id="auth-err" style="margin-top:10px"></p>
-    <p class="auth-hint">Your game display name is set on the previous screen.</p>
   </div>
 </div>
 
@@ -1274,14 +1274,46 @@ let _authSession = null;
 
 async function initSupabase() {
   try {
-    const res  = await fetch('/api/config');
-    const cfg  = await res.json();
-    if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) return;
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+    if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+      show('profile'); // no auth configured — go straight to profile
+      return;
+    }
     _supabase = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
     const { data: { session } } = await _supabase.auth.getSession();
     _authSession = session;
     _supabase.auth.onAuthStateChange((_, sess) => { _authSession = sess; });
-  } catch(e) { /* Supabase not configured */ }
+
+    if (_authSession) {
+      await loadAndPrefillProfile(); // returning user — pre-fill and go to profile
+    }
+    // else: auth screen stays visible (it's the default active screen)
+  } catch(e) { show('profile'); }
+}
+
+async function loadAndPrefillProfile() {
+  if (!_supabase || !_authSession) { show('profile'); return; }
+  try {
+    const { data: player } = await _supabase
+      .from('players')
+      .select('username, country')
+      .eq('id', _authSession.user.id)
+      .single();
+    if (player?.username) {
+      document.getElementById('inp-name').value = player.username;
+      if (player.country) {
+        const inp = document.getElementById('inp-country');
+        inp.value = player.country;
+        _countryValid = true;
+        inp.classList.add('country-valid');
+      }
+    }
+  } catch(e) { /* new user or no profile yet */ }
+  // Show logout button on menu
+  const btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) btnLogout.style.display = 'block';
+  show('profile');
 }
 
 // ── Player identity (persists across sessions via localStorage) ──
@@ -1369,6 +1401,12 @@ function continueToMenu() {
   const big = document.getElementById('menu-av-big');
   big.textContent = S.myAvatar; big.style.background = ch.bg;
   document.getElementById('menu-name').textContent = n;
+  // Persist profile to Supabase (fire-and-forget)
+  if (_supabase && _authSession) {
+    _supabase.from('players')
+      .upsert({ id: _authSession.user.id, username: n, country: countryVal || '' }, { onConflict: 'id' })
+      .catch(() => {});
+  }
   show('menu');
 }
 document.getElementById('inp-name').addEventListener('keydown', e => { if(e.key==='Enter') continueToMenu(); });
@@ -1433,7 +1471,7 @@ function switchAuthTab(tab) {
 }
 
 async function doLogin() {
-  if (!_supabase) return socket_competitiveJoinDirect(); // no auth configured
+  if (!_supabase) { show('profile'); return; }
   const email = document.getElementById('li-email').value.trim();
   const pass  = document.getElementById('li-password').value;
   if (!email || !pass) { document.getElementById('auth-err').textContent = 'Enter email and password'; return; }
@@ -1442,12 +1480,14 @@ async function doLogin() {
   if (error) { document.getElementById('auth-err').textContent = error.message; return; }
   _authSession = data.session;
   document.getElementById('auth-err').textContent = '';
-  toast('✅ Signed in! Joining competitive queue...');
-  socket_competitiveJoinDirect();
+  const btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) btnLogout.style.display = 'block';
+  toast('✅ Signed in!');
+  await loadAndPrefillProfile();
 }
 
 async function doSignup() {
-  if (!_supabase) return socket_competitiveJoinDirect();
+  if (!_supabase) { show('profile'); return; }
   const email   = document.getElementById('su-email').value.trim();
   const pass    = document.getElementById('su-password').value;
   const confirm = document.getElementById('su-confirm').value;
@@ -1455,17 +1495,27 @@ async function doSignup() {
   if (pass !== confirm) { document.getElementById('auth-err').textContent = 'Passwords do not match'; return; }
   if (pass.length < 6)  { document.getElementById('auth-err').textContent = 'Password must be at least 6 characters'; return; }
   document.getElementById('auth-err').textContent = 'Creating account...';
-  const { data, error } = await _supabase.auth.signUp({ email, password: pass, options: { data: { username: S.myName } } });
+  const { data, error } = await _supabase.auth.signUp({ email, password: pass });
   if (error) { document.getElementById('auth-err').textContent = error.message; return; }
   _authSession = data.session;
   document.getElementById('auth-err').textContent = '';
-  if (!_authSession) {
-    document.getElementById('auth-err').style.color = 'var(--g)';
-    document.getElementById('auth-err').textContent = '✅ Account created! Check your email to confirm, then log in.';
-    return;
-  }
-  toast('✅ Account created! Joining competitive queue...');
-  socket_competitiveJoinDirect();
+  const btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) btnLogout.style.display = 'block';
+  toast('✅ Account created! Set up your profile.');
+  show('profile'); // new user — profile is blank, let them fill it
+}
+
+async function doLogout() {
+  if (_supabase) await _supabase.auth.signOut().catch(() => {});
+  _authSession = null;
+  S.myName = ''; S.myCountry = ''; S.myAvatar = '🦁';
+  document.getElementById('inp-name').value = '';
+  document.getElementById('inp-country').value = '';
+  _countryValid = false;
+  document.getElementById('inp-country').classList.remove('country-valid');
+  const btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) btnLogout.style.display = 'none';
+  show('auth');
 }
 
 function socket_competitiveJoinDirect() {
@@ -1561,15 +1611,10 @@ function confirmCodeJoin() {
 function quickJoin() { stopBrowse(); S.socket.emit('room:quick-join',{name:S.myName,avatar:S.myAvatar}); }
 function competitiveJoin() {
   if (!S.myCountry) {
-    document.getElementById('join-err').textContent = 'Enter your country on the profile screen to play Competitively.';
+    document.getElementById('join-err').textContent = 'Add your country on the profile screen to play Competitive.';
     toast('⚠ Country required for Competitive mode'); return;
   }
   stopBrowse();
-  // Require auth if Supabase is configured
-  if (_supabase && !_authSession) {
-    show('auth');
-    return;
-  }
   socket_competitiveJoinDirect();
 }
 
