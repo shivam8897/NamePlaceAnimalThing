@@ -1,9 +1,13 @@
 -- ══════════════════════════════════════════════════
 --  N·P·A·T  —  Supabase Schema
 --  Paste this into Supabase SQL Editor and run it once.
+--
+--  NOTE: Enable Supabase Auth in your project.
+--  For a smooth game experience, disable email confirmation:
+--  Authentication → Providers → Email → "Confirm email" → OFF
 -- ══════════════════════════════════════════════════
 
--- Players: one row per device (UUID generated client-side, stored in localStorage)
+-- Players: one row per authenticated user (id = Supabase auth user UUID)
 CREATE TABLE IF NOT EXISTS players (
   id         UUID PRIMARY KEY,
   username   TEXT NOT NULL,
@@ -17,19 +21,34 @@ CREATE TABLE IF NOT EXISTS match_results (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   player_id  UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   score      INTEGER NOT NULL,
+  ai_scored  BOOLEAN NOT NULL DEFAULT FALSE,
   played_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Funny Words of the Day: top 3 per day, reset at midnight
+CREATE TABLE IF NOT EXISTS funny_words (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rank        INTEGER NOT NULL,
+  answer      TEXT NOT NULL,
+  field       TEXT NOT NULL,
+  letter      CHAR(1) NOT NULL,
+  player_name TEXT NOT NULL DEFAULT '',
+  reason      TEXT NOT NULL DEFAULT '',
+  word_date   DATE NOT NULL DEFAULT CURRENT_DATE
+);
+
 -- Leaderboard view: ranks computed live from match history
+-- all_ai_scored = false means at least one match is still pending AI patch
 CREATE OR REPLACE VIEW leaderboard AS
 SELECT
   p.id,
   p.username,
   p.country,
-  COALESCE(SUM(mr.score), 0)::INTEGER  AS total_score,
-  COUNT(mr.id)::INTEGER                 AS matches,
-  COALESCE(MAX(mr.score), 0)::INTEGER  AS best_score,
-  RANK() OVER (ORDER BY COALESCE(SUM(mr.score), 0) DESC)::INTEGER AS rank
+  COALESCE(SUM(mr.score), 0)::INTEGER   AS total_score,
+  COUNT(mr.id)::INTEGER                  AS matches,
+  COALESCE(MAX(mr.score), 0)::INTEGER   AS best_score,
+  RANK() OVER (ORDER BY COALESCE(SUM(mr.score), 0) DESC)::INTEGER AS rank,
+  BOOL_AND(COALESCE(mr.ai_scored, FALSE)) AS all_ai_scored
 FROM players p
 INNER JOIN match_results mr ON mr.player_id = p.id
 GROUP BY p.id, p.username, p.country
@@ -50,12 +69,17 @@ CREATE TRIGGER trg_players_updated
 -- Row Level Security
 ALTER TABLE players       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE match_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE funny_words   ENABLE ROW LEVEL SECURITY;
 
--- Public read (leaderboard is visible to everyone)
-CREATE POLICY "public read players"  ON players       FOR SELECT USING (true);
-CREATE POLICY "public read results"  ON match_results FOR SELECT USING (true);
+-- Public read
+CREATE POLICY "public read players"      ON players       FOR SELECT USING (true);
+CREATE POLICY "public read results"      ON match_results FOR SELECT USING (true);
+CREATE POLICY "public read funny_words"  ON funny_words   FOR SELECT USING (true);
 
--- Anyone can insert/update (server uses anon key; no auth required)
+-- Write policies (server uses anon key; no auth required for these operations)
 CREATE POLICY "insert players"       ON players       FOR INSERT WITH CHECK (true);
 CREATE POLICY "update players"       ON players       FOR UPDATE USING (true);
 CREATE POLICY "insert results"       ON match_results FOR INSERT WITH CHECK (true);
+CREATE POLICY "update results"       ON match_results FOR UPDATE USING (true);
+CREATE POLICY "insert funny_words"   ON funny_words   FOR INSERT WITH CHECK (true);
+CREATE POLICY "delete funny_words"   ON funny_words   FOR DELETE USING (true);

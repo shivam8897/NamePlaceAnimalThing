@@ -7,22 +7,28 @@ const crypto     = require('crypto');
 const compression = require('compression');
 const { createClient } = require('@supabase/supabase-js');
 
+let Anthropic = null;
+try { Anthropic = require('@anthropic-ai/sdk'); } catch(e) {}
+const anthropic = (Anthropic && process.env.ANTHROPIC_API_KEY)
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
+
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
-// Supabase — only active once .env is configured
 const supabase = (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY)
   ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
   : null;
-if (!supabase) console.warn('[Supabase] Not configured — competitive scores will not be saved.');
+if (!supabase)   console.warn('[Supabase]   Not configured — competitive scores will not be saved.');
+if (!anthropic)  console.warn('[Anthropic]  Not configured — AI scoring unavailable (provisional scores only).');
 
 app.use(compression());
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h', etag: true }));
 app.use(express.json());
 
 // ─── Config ──────────────────────────────────────────────────
-const LETTERS        = 'BCDFGHJKLMNPRST'.split('');
+const LETTERS            = 'BCDFGHJKLMNPRST'.split('');
 const DEFAULT_ROUND_TIME = 30;
 const DEFAULT_ROUNDS     = 10;
 const DEFAULT_MAX        = 8;
@@ -30,14 +36,69 @@ const AUTO_ADVANCE       = 30;
 const TIMER_OPTIONS      = [10, 20, 30, 60];
 const ROUND_OPTIONS      = [3, 5, 10];
 
-// Speed bonus for ranked submission order (multiple players rewarded)
-const SPEED_BONUS = [20, 15, 10, 7, 5]; // index 4 used for 5th and beyond
+const COMP_ROUNDS      = 5;
+const COMP_PLAYERS     = 8;
+const COMP_START_DELAY = 10;
+const COMP_AUTO_ADV    = 20;
+const COMP_DAILY_LIMIT = 5;    // competitive matches per player per day
+const MAX_DAILY_API_CALLS = 50; // hard cap on AI API calls per day
+const BATCH_SIZE       = 5;    // max matches processed per batch call
+const BATCH_INTERVAL   = 5 * 60 * 1000; // 5 minutes
 
-const UNIQUE_PTS   = 100;
-const SHARED_PTS   = 50;
+const SPEED_BONUS      = [20, 15, 10, 7, 5];
+const UNIQUE_PTS       = 100;
+const SHARED_PTS       = 50;
 const FULL_HOUSE_BONUS = 20;
 const LAST_ROUND_MULT  = 1.5;
-const VOTE_DURATION    = 60; // seconds for the evaluation phase
+const VOTE_DURATION    = 60;
+
+// ─── Batch scoring state ──────────────────────────────────────
+const pendingBatch = []; // matches awaiting AI validation
+let dailyApiCalls  = 0;
+let _lastResetDay  = new Date().toISOString().slice(0, 10);
+
+const VALID_COUNTRIES = new Set([
+  'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda',
+  'Argentina','Armenia','Australia','Austria','Azerbaijan',
+  'Bahamas','Bahrain','Bangladesh','Barbados','Belarus','Belgium','Belize',
+  'Benin','Bhutan','Bolivia','Bosnia and Herzegovina','Botswana','Brazil',
+  'Brunei','Bulgaria','Burkina Faso','Burundi',
+  'Cabo Verde','Cambodia','Cameroon','Canada','Central African Republic','Chad',
+  'Chile','China','Colombia','Comoros','Congo','Costa Rica','Croatia','Cuba','Cyprus',
+  'Czech Republic',
+  'DR Congo','Denmark','Djibouti','Dominica','Dominican Republic',
+  'Ecuador','Egypt','El Salvador','Equatorial Guinea','Eritrea','Estonia','Eswatini','Ethiopia',
+  'Fiji','Finland','France',
+  'Gabon','Gambia','Georgia','Germany','Ghana','Greece','Grenada','Guatemala','Guinea',
+  'Guinea-Bissau','Guyana',
+  'Haiti','Honduras','Hungary',
+  'Iceland','India','Indonesia','Iran','Iraq','Ireland','Israel','Italy',
+  'Jamaica','Japan','Jordan',
+  'Kazakhstan','Kenya','Kiribati','Kuwait','Kyrgyzstan',
+  'Laos','Latvia','Lebanon','Lesotho','Liberia','Libya','Liechtenstein','Lithuania','Luxembourg',
+  'Madagascar','Malawi','Malaysia','Maldives','Mali','Malta','Marshall Islands','Mauritania',
+  'Mauritius','Mexico','Micronesia','Moldova','Monaco','Mongolia','Montenegro','Morocco',
+  'Mozambique','Myanmar',
+  'Namibia','Nauru','Nepal','Netherlands','New Zealand','Nicaragua','Niger','Nigeria',
+  'North Korea','North Macedonia','Norway',
+  'Oman',
+  'Pakistan','Palau','Panama','Papua New Guinea','Paraguay','Peru','Philippines',
+  'Poland','Portugal',
+  'Qatar',
+  'Romania','Russia','Rwanda',
+  'Saint Kitts and Nevis','Saint Lucia','Saint Vincent and the Grenadines','Samoa',
+  'San Marino','Sao Tome and Principe','Saudi Arabia','Senegal','Serbia','Seychelles',
+  'Sierra Leone','Singapore','Slovakia','Slovenia','Solomon Islands','Somalia',
+  'South Africa','South Korea','South Sudan','Spain','Sri Lanka','Sudan','Suriname',
+  'Sweden','Switzerland','Syria',
+  'Taiwan','Tajikistan','Tanzania','Thailand','Timor-Leste','Togo','Tonga',
+  'Trinidad and Tobago','Tunisia','Turkey','Turkmenistan','Tuvalu',
+  'Uganda','Ukraine','United Arab Emirates','United Kingdom','United States','Uruguay','Uzbekistan',
+  'Vanuatu','Vatican City','Venezuela','Vietnam',
+  'Yemen','Zambia','Zimbabwe',
+  // Common short-forms
+  'USA','UK','UAE',
+]);
 
 // ─── Fuzzy matching ──────────────────────────────────────────
 function normAnswer(s) {
@@ -59,16 +120,14 @@ function editDistance(a, b) {
   return dp[m][n];
 }
 
-// Cluster a new normalized answer into existing cluster keys
 function clusterKey(norm, keys) {
   if (!norm) return '';
   for (const k of keys) {
     if (!k) continue;
     if (norm === k) return k;
-    // Fuzzy only for words 4+ chars; allow 1 edit (one-letter typo)
     if (norm.length >= 4 && k.length >= 4 && editDistance(norm, k) <= 1) return k;
   }
-  return norm; // new cluster
+  return norm;
 }
 
 const rooms = new Map();
@@ -86,27 +145,31 @@ function pickLetter(used) {
 }
 
 function makeRoom(hostId, hostName, hostAvatar, opts = {}) {
-  const code      = genCode();
-  const roundTime = TIMER_OPTIONS.includes(+opts.timer)   ? +opts.timer   : DEFAULT_ROUND_TIME;
-  const maxRounds = ROUND_OPTIONS.includes(+opts.rounds)  ? +opts.rounds  : DEFAULT_ROUNDS;
-  const maxPlayers= Math.min(8, Math.max(2, parseInt(opts.maxPlayers) || DEFAULT_MAX));
+  const code       = genCode();
+  const roundTime  = TIMER_OPTIONS.includes(+opts.timer)  ? +opts.timer  : DEFAULT_ROUND_TIME;
+  const maxRounds  = ROUND_OPTIONS.includes(+opts.rounds) ? +opts.rounds : DEFAULT_ROUNDS;
+  const maxPlayers = Math.min(8, Math.max(2, parseInt(opts.maxPlayers) || DEFAULT_MAX));
   const isPublic      = opts.isPublic !== false;
   const isCompetitive = !!opts.isCompetitive;
 
   const room = {
     code, host: hostId,
-    players: new Map([[hostId, { name: hostName, score: 0, avatar: hostAvatar || '🦁', country: opts.country || '', playerId: opts.playerId || null }]]),
+    players: new Map([[hostId, {
+      name: hostName, score: 0, avatar: hostAvatar || '🦁',
+      country: opts.country || '', playerId: opts.playerId || null,
+    }]]),
     state: 'waiting',
     round: 0, maxRounds, maxPlayers, roundTime, isPublic, isCompetitive,
     letter: null, usedLetters: [],
     timer: null, autoTimer: null,
     timeLeft: roundTime, roundStartTime: null,
-    submissions: new Map(),
-    submissionOrder: [],
+    submissions: new Map(), submissionOrder: [],
     roundScores: null, autoCount: 0,
-    answerVotes: new Map(), // key:`${pid}_${field}` → { up:Set, down:Set }
+    answerVotes: new Map(),
     evalData: {}, evalTimer: null, evalTimeLeft: 0,
     evalDone: new Set(),
+    compStartTimer: null, compStartCount: 0,
+    roundHistory: [], // stores each round's data for batch AI processing
   };
   rooms.set(code, room);
   return room;
@@ -136,28 +199,25 @@ function roomSummary(room) {
   };
 }
 
-// ─── Validation ──────────────────────────────────────────────
-function validateAnswer(answer, letter) {
-  if (!answer || !answer.trim()) return { valid: true };
-  const s = answer.trim();
-  if (s[0].toUpperCase() !== letter.toUpperCase())
-    return { valid: false, reason: `Must start with "${letter}"` };
-  if (s.replace(/[\s\-']/g, '').length < 2)
-    return { valid: false, reason: 'Too short (min 2 letters)' };
-  if (!/^[a-zA-Z\s\-'.]+$/.test(s))
-    return { valid: false, reason: 'Letters only, no numbers' };
-  const alpha = s.replace(/[^a-zA-Z]/g, '');
-  if (alpha.length >= 3 && new Set(alpha.toLowerCase()).size === 1)
-    return { valid: false, reason: 'Not a real word' };
-  return { valid: true };
+// ─── Input sanitization (prevent prompt injection) ────────────
+function sanitizeForAI(str) {
+  if (!str) return '';
+  return str
+    .replace(/[\x00-\x1F\x7F]/g, '')  // control characters
+    .replace(/[`'"\\]/g, '')            // quote / escape chars
+    .replace(/[{}\[\]]/g, '')           // JSON structural chars
+    .replace(/\b(ignore|forget|disregard|system|instruction|prompt)\b/gi, '')
+    .slice(0, 60)
+    .trim();
 }
 
-// ─── Scoring (runs after evaluation phase) ───────────────────
+// ─── Scoring ─────────────────────────────────────────────────
 function getEffectiveValidity(room, pid, field) {
   const ea = room.evalData[pid]?.answers[field];
   if (!ea || ea.status === 'blank') return false;
-  if (ea.status === 'auto_invalid') return false;
-  // needs_vote: majority invalid → invalid, otherwise benefit of doubt
+  if (ea.status === 'auto_invalid' || ea.status === 'ai_invalid') return false;
+  if (ea.status === 'ai_valid' || ea.status === 'pending') return true;
+  // needs_vote: majority invalid → invalid
   const v = room.answerVotes.get(`${pid}_${field}`);
   if (v) {
     const eligible = Math.max(1, room.players.size - 1);
@@ -170,9 +230,7 @@ function scoreRound(room) {
   const fields    = ['name', 'place', 'animal', 'thing'];
   const isLastRnd = room.round >= room.maxRounds;
 
-  // Build fuzzy cluster frequency maps using only effectively-valid answers
-  const clusterFreq   = {};
-  const answerCluster = {};
+  const clusterFreq = {}, answerCluster = {};
   fields.forEach(f => { clusterFreq[f] = {}; answerCluster[f] = {}; });
 
   room.submissions.forEach((sub, pid) => {
@@ -204,6 +262,8 @@ function scoreRound(room) {
         breakdown[f] = { answer: '', points: 0, reason: 'blank' };
       } else if (ea?.status === 'auto_invalid') {
         breakdown[f] = { answer: raw, points: 0, reason: 'invalid', note: ea.note };
+      } else if (ea?.status === 'ai_invalid') {
+        breakdown[f] = { answer: raw, points: 0, reason: 'invalid', note: ea.note || 'Rejected by AI' };
       } else if (!effective) {
         breakdown[f] = { answer: raw, points: 0, reason: 'voted_invalid' };
       } else {
@@ -238,6 +298,67 @@ function scoreRound(room) {
   return results;
 }
 
+// Pure scoring for batch AI re-evaluation (does not mutate room state)
+function recalcMatchScores(match) {
+  const fields    = ['name', 'place', 'animal', 'thing'];
+  const socketIds = match.players.map(p => p.socketId);
+  const totals    = {};
+  socketIds.forEach(id => { totals[id] = 0; });
+
+  match.rounds.forEach((round, ri) => {
+    const isLast = ri === match.rounds.length - 1;
+    const { submissions, evalData, submissionOrder } = round;
+
+    function isValid(pid, field) {
+      const ea = evalData[pid]?.answers[field];
+      if (!ea || ea.status === 'blank' || ea.status === 'auto_invalid' || ea.status === 'ai_invalid') return false;
+      return true;
+    }
+
+    const clusterFreq = {}, answerCluster = {};
+    fields.forEach(f => { clusterFreq[f] = {}; answerCluster[f] = {}; });
+
+    socketIds.forEach(pid => {
+      const sub = submissions[pid] || {};
+      fields.forEach(f => {
+        if (!isValid(pid, f)) return;
+        const raw = (sub[f] || '').trim();
+        if (!raw) return;
+        const norm = normAnswer(raw);
+        const key  = clusterKey(norm, Object.keys(clusterFreq[f]));
+        answerCluster[f][pid] = key;
+        clusterFreq[f][key]   = (clusterFreq[f][key] || 0) + 1;
+      });
+    });
+
+    socketIds.forEach(pid => {
+      const sub = submissions[pid] || {};
+      let roundPts = 0, validCount = 0;
+
+      fields.forEach(f => {
+        if (!isValid(pid, f)) return;
+        const raw = (sub[f] || '').trim();
+        if (!raw) return;
+        const ck    = answerCluster[f][pid];
+        const count = ck ? (clusterFreq[f][ck] || 1) : 1;
+        roundPts += count === 1 ? UNIQUE_PTS : SHARED_PTS;
+        validCount++;
+      });
+
+      if (validCount === 4) roundPts += FULL_HOUSE_BONUS;
+      if (validCount >= 3) {
+        const rank = submissionOrder.indexOf(pid);
+        if (rank >= 0) roundPts += SPEED_BONUS[Math.min(rank, SPEED_BONUS.length - 1)];
+      }
+      if (isLast && roundPts > 0) roundPts += Math.round(roundPts * (LAST_ROUND_MULT - 1));
+
+      totals[pid] = (totals[pid] || 0) + roundPts;
+    });
+  });
+
+  return totals;
+}
+
 function leaderboard(room) {
   return Array.from(room.players.entries())
     .map(([id, p]) => ({ id, name: p.name, score: p.score, avatar: p.avatar || '🦁' }))
@@ -254,9 +375,9 @@ function startRound(room) {
   room.submissions.clear();
   room.submissionOrder = [];
   room.roundScores = null;
-  room.answerVotes  = new Map();
-  room.evalData     = {};
-  room.evalDone     = new Set();
+  room.answerVotes = new Map();
+  room.evalData    = {};
+  room.evalDone    = new Set();
   clearInterval(room.evalTimer);
   room.timeLeft = room.roundTime;
   room.roundStartTime = Date.now();
@@ -276,12 +397,10 @@ function startRound(room) {
 function endRound(room) {
   if (room.state !== 'playing') return;
   clearInterval(room.timer);
-  room.state = 'evaluating';
 
   const fields = ['name', 'place', 'animal', 'thing'];
 
-  // Only auto-check: does the answer start with the correct letter?
-  // Everything else goes to voters.
+  // Build evalData (auto-check letter; rest depends on mode)
   room.submissions.forEach((sub, pid) => {
     const player = room.players.get(pid);
     room.evalData[pid] = { name: player?.name||'?', avatar: player?.avatar||'🦁', answers: {} };
@@ -294,24 +413,80 @@ function endRound(room) {
         status = 'auto_invalid';
         note   = `Must start with "${room.letter}"`;
       } else {
-        status = 'needs_vote';
+        status = room.isCompetitive ? 'pending' : 'needs_vote';
       }
       room.evalData[pid].answers[f] = { answer: raw, status, note };
     });
   });
 
-  const EVAL_TIME = VOTE_DURATION;
-  room.evalTimeLeft = EVAL_TIME;
+  if (room.isCompetitive) {
+    // Give benefit of doubt immediately; batch AI validates in background
+    applyAIFallback(room);
+    room.state = 'scoring';
+    finalizeRoundCompetitive(room);
+    return;
+  }
+
+  // Regular game: voting / evaluation
+  room.state = 'evaluating';
+  room.evalTimeLeft = VOTE_DURATION;
 
   io.to(room.code).emit('evaluation:start', {
     evalData: room.evalData, letter: room.letter,
-    round: room.round, maxRounds: room.maxRounds, evalTime: EVAL_TIME,
+    round: room.round, maxRounds: room.maxRounds, evalTime: VOTE_DURATION,
   });
 
   room.evalTimer = setInterval(() => {
     room.evalTimeLeft--;
     io.to(room.code).emit('evaluation:tick', { timeLeft: room.evalTimeLeft });
     if (room.evalTimeLeft <= 0) { clearInterval(room.evalTimer); finalizeEvaluation(room); }
+  }, 1000);
+}
+
+// ─── AI fallback: treat all pending answers as valid ──────────
+function applyAIFallback(room) {
+  room.submissions.forEach((sub, pid) => {
+    ['name','place','animal','thing'].forEach(f => {
+      const ea = room.evalData[pid]?.answers[f];
+      if (ea?.status === 'pending') ea.status = 'ai_valid';
+    });
+  });
+}
+
+function finalizeRoundCompetitive(room) {
+  if (room.state !== 'scoring') return;
+
+  // Deep-copy round data for batch AI processing later
+  room.roundHistory.push({
+    letter: room.letter,
+    submissions: Object.fromEntries(room.submissions),
+    evalData: JSON.parse(JSON.stringify(room.evalData)),
+    submissionOrder: [...room.submissionOrder],
+  });
+
+  const scores  = scoreRound(room);
+  room.roundScores = scores;
+  const lb      = leaderboard(room);
+  const isLast  = room.round >= room.maxRounds;
+
+  // aiScored:false tells the client scores are provisional
+  io.to(room.code).emit('round:end', {
+    scores, leaderboard: lb, round: room.round, maxRounds: room.maxRounds,
+    isLastRound: isLast, aiScored: false,
+  });
+
+  if (isLast) {
+    saveCompetitiveScores(room, lb);
+    setTimeout(() => { room.state = 'gameover'; io.to(room.code).emit('game:over', { leaderboard: lb }); }, 10000);
+    return;
+  }
+
+  room.autoCount = COMP_AUTO_ADV;
+  io.to(room.code).emit('auto:advance', { seconds: room.autoCount });
+  room.autoTimer = setInterval(() => {
+    room.autoCount--;
+    io.to(room.code).emit('auto:tick', { seconds: room.autoCount });
+    if (room.autoCount <= 0) { clearInterval(room.autoTimer); if (room.state === 'scoring') startRound(room); }
   }, 1000);
 }
 
@@ -330,7 +505,6 @@ function finalizeEvaluation(room) {
   });
 
   if (isLast) {
-    if (room.isCompetitive) saveCompetitiveScores(room, lb);
     setTimeout(() => { room.state = 'gameover'; io.to(room.code).emit('game:over', { leaderboard: lb }); }, 10000);
     return;
   }
@@ -344,34 +518,351 @@ function finalizeEvaluation(room) {
   }, 1000);
 }
 
-// ─── Supabase: save scores after a competitive game ends ─────
+// ─── Competitive auto-start ───────────────────────────────────
+function startCompetitiveCountdown(room) {
+  if (room.compStartTimer || room.state !== 'waiting') return;
+  room.compStartCount = COMP_START_DELAY;
+  io.to(room.code).emit('competitive:countdown', { count: room.compStartCount });
+  room.compStartTimer = setInterval(() => {
+    room.compStartCount--;
+    if (room.compStartCount <= 0) {
+      clearInterval(room.compStartTimer);
+      room.compStartTimer = null;
+      if (room.state !== 'waiting') return;
+      room.state = 'countdown';
+      let count = 3;
+      io.to(room.code).emit('game:countdown', { count });
+      const cd = setInterval(() => {
+        count--;
+        if (count <= 0) { clearInterval(cd); startRound(room); }
+        else io.to(room.code).emit('game:countdown', { count });
+      }, 1000);
+    } else {
+      io.to(room.code).emit('competitive:countdown', { count: room.compStartCount });
+    }
+  }, 1000);
+}
+
+// ─── Supabase: save scores ────────────────────────────────────
+async function savePlayerScore(playerId, score, username, country) {
+  if (!supabase || !playerId) return;
+  try {
+    await supabase.from('players').upsert(
+      { id: playerId, username, country: country || '' },
+      { onConflict: 'id' }
+    );
+    await supabase.from('match_results').insert({ player_id: playerId, score, ai_scored: false });
+  } catch (e) {
+    console.error('[Supabase] Error saving score:', e.message);
+  }
+}
+
 async function saveCompetitiveScores(room, lb) {
   if (!supabase) return;
   try {
+    const batchItem = {
+      roomCode: room.code,
+      players: [],
+      rounds: room.roundHistory.map(r => ({
+        letter: r.letter,
+        submissions: r.submissions,
+        evalData: r.evalData,
+        submissionOrder: r.submissionOrder,
+      })),
+      savedAt: Date.now(),
+    };
+
     for (const entry of lb) {
       const player = room.players.get(entry.id);
       if (!player?.playerId) continue;
+
       await supabase.from('players').upsert(
         { id: player.playerId, username: player.name, country: player.country || '' },
         { onConflict: 'id' }
       );
-      await supabase.from('match_results').insert({ player_id: player.playerId, score: entry.score });
+
+      const { data: mr, error } = await supabase
+        .from('match_results')
+        .insert({ player_id: player.playerId, score: entry.score, ai_scored: false })
+        .select('id')
+        .single();
+
+      if (!error && mr) {
+        batchItem.players.push({
+          socketId: entry.id,
+          playerId: player.playerId,
+          name: player.name,
+          country: player.country || '',
+          provisionalScore: entry.score,
+          matchResultId: mr.id,
+        });
+      } else if (error) {
+        console.error('[Supabase] match_results insert error:', error.message);
+      }
     }
-    console.log(`[Supabase] Saved ${lb.length} competitive scores for room ${room.code}`);
+
+    if (batchItem.players.length > 0) {
+      pendingBatch.push(batchItem);
+      console.log(`[Supabase] Queued ${batchItem.players.length} players from room ${room.code} for AI batch`);
+    }
   } catch (e) {
-    console.error('[Supabase] Error saving scores:', e.message);
+    console.error('[Supabase] Error saving competitive scores:', e.message);
   }
 }
 
-// ─── Smart join — fills most-populated public rooms first ────
-function findBestPublicRoom(exclude) {
+// ─── Funny words update ───────────────────────────────────────
+async function updateFunnyWords(newWords) {
+  if (!supabase || !newWords?.length) return;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    await supabase.from('funny_words').delete().eq('word_date', today);
+    await supabase.from('funny_words').insert(
+      newWords.slice(0, 3).map((w, i) => ({
+        rank: i + 1,
+        answer: w.answer,
+        field: w.field,
+        letter: w.letter,
+        player_name: w.playerName || '',
+        reason: w.reason || '',
+        word_date: today,
+      }))
+    );
+    console.log(`[FunnyWords] Saved ${Math.min(newWords.length, 3)} words for ${today}`);
+  } catch (e) {
+    console.error('[FunnyWords] Error:', e.message);
+  }
+}
+
+// ─── Batch AI scoring (every 5 minutes) ──────────────────────
+async function processPendingBatch() {
+  if (pendingBatch.length === 0) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== _lastResetDay) {
+    _lastResetDay = today;
+    dailyApiCalls = 0;
+    console.log('[Daily] Reset: API call counter reset to 0');
+  }
+
+  const count = Math.min(BATCH_SIZE, pendingBatch.length);
+  const batch = pendingBatch.splice(0, count);
+  console.log(`[Batch] Processing ${batch.length} match(es), dailyApiCalls=${dailyApiCalls}`);
+
+  if (!anthropic || dailyApiCalls >= MAX_DAILY_API_CALLS) {
+    const reason = !anthropic ? 'no AI configured' : 'daily cap reached';
+    console.warn(`[Batch] Skipping AI (${reason}) — keeping provisional scores`);
+    return;
+  }
+
+  dailyApiCalls++;
+
+  // Collect all answers that need validation
+  const answerList = [];
+  batch.forEach((match, mi) => {
+    match.rounds.forEach((round, ri) => {
+      const { letter, submissions, evalData } = round;
+      Object.keys(submissions).forEach(sid => {
+        ['name', 'place', 'animal', 'thing'].forEach(field => {
+          const ea = evalData[sid]?.answers[field];
+          if (ea?.status === 'ai_valid' && ea.answer) {
+            answerList.push({
+              idx: answerList.length,
+              mi, ri, sid, field,
+              answer: sanitizeForAI(ea.answer),
+              letter,
+            });
+          }
+        });
+      });
+    });
+  });
+
+  try {
+    let funnyResult = [];
+
+    if (answerList.length === 0) {
+      // Nothing to validate; still mark records as scored
+      for (const match of batch)
+        for (const p of match.players)
+          if (supabase && p.matchResultId)
+            await supabase.from('match_results').update({ ai_scored: true }).eq('id', p.matchResultId).catch(() => {});
+      return;
+    }
+
+    // Get current funny words to include in prompt for comparison
+    let currentFunny = [];
+    if (supabase) {
+      const { data } = await supabase.from('funny_words').select('*').eq('word_date', today).order('rank');
+      currentFunny = data || [];
+    }
+
+    const lines = answerList.map(a =>
+      `${a.idx}: letter="${a.letter}" cat="${a.field}" ans="${a.answer}"`
+    );
+
+    const currentFunnyBlock = currentFunny.length
+      ? `\nToday's current funny words (keep if nothing better found):\n${currentFunny.map(w =>
+          `  - "${w.answer}" (${w.field}, ${w.letter}, by ${w.player_name || 'anon'}) — "${w.reason}"`
+        ).join('\n')}\n`
+      : '';
+
+    const prompt =
+`You are validating answers for a Name-Place-Animal-Thing word game.
+For each numbered entry: is the answer a real word in that category AND does it start with the given letter?
+Be lenient — only mark false if clearly wrong, gibberish, offensive, or obviously doesn't start with the letter.
+${currentFunnyBlock}
+Entries to validate:
+${lines.join('\n')}
+
+Also pick up to 3 funniest or most creative valid answers (not offensive/profane) for "Words of the Day". Compare with the current words above and keep the best 3 overall.
+
+Reply ONLY with compact JSON (no other text):
+{"v":{"0":true,"1":false},"funny":[{"idx":2,"reason":"creative pick"},{"keep":true,"answer":"...","field":"...","letter":"...","player":"...","reason":"..."}]}
+
+Notes: "v" maps idx→validity. "funny" can mix {"idx":N} for new picks or {"keep":true,...} to keep an existing word.`;
+
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const text     = msg.content[0].text.trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in AI response');
+
+    const parsed   = JSON.parse(jsonMatch[0]);
+    const validity = parsed.v || {};
+    const funnyRaw = Array.isArray(parsed.funny) ? parsed.funny : [];
+
+    // Apply AI verdicts to batch evalData
+    let invalidCount = 0;
+    answerList.forEach(item => {
+      if (validity[String(item.idx)] === false) {
+        batch[item.mi].rounds[item.ri].evalData[item.sid].answers[item.field].status = 'ai_invalid';
+        invalidCount++;
+      }
+    });
+
+    // Recalculate each match's scores with AI-corrected evalData
+    for (const match of batch) {
+      const newTotals = recalcMatchScores(match);
+      for (const p of match.players) {
+        const newScore = newTotals[p.socketId] ?? p.provisionalScore;
+        if (supabase && p.matchResultId) {
+          await supabase.from('match_results')
+            .update({ score: newScore, ai_scored: true })
+            .eq('id', p.matchResultId)
+            .catch(e => console.error('[Batch] DB update error:', e.message));
+        }
+        p.aiScore = newScore;
+      }
+    }
+
+    // Build funny words list
+    const VALID_FIELDS = new Set(['name','place','animal','thing']);
+    funnyResult = funnyRaw.slice(0, 3).map(f => {
+      if (f.keep) {
+        return {
+          answer:     sanitizeForAI(f.answer || ''),
+          field:      VALID_FIELDS.has(f.field) ? f.field : 'thing',
+          letter:     (f.letter || '?').toUpperCase().slice(0, 1),
+          playerName: sanitizeForAI(f.player || ''),
+          reason:     sanitizeForAI(f.reason || ''),
+        };
+      }
+      const idx = parseInt(f.idx);
+      const item = Number.isFinite(idx) ? answerList[idx] : null;
+      if (!item || validity[String(idx)] === false) return null; // don't pick invalid answers
+      const matchPlayer = batch[item.mi]?.players.find(p => p.socketId === item.sid);
+      return {
+        answer:     item.answer,
+        field:      item.field,
+        letter:     item.letter,
+        playerName: sanitizeForAI(matchPlayer?.name || ''),
+        reason:     sanitizeForAI(f.reason || ''),
+      };
+    }).filter(Boolean);
+
+    if (funnyResult.length > 0) await updateFunnyWords(funnyResult);
+
+    // Emit score patches to any rooms still open
+    for (const match of batch) {
+      if (match.roomCode && io.sockets.adapter.rooms.get(match.roomCode)?.size) {
+        const patchScores = {};
+        match.players.forEach(p => { if (p.aiScore !== undefined) patchScores[p.socketId] = p.aiScore; });
+        io.to(match.roomCode).emit('scores:patched', { scores: patchScores });
+      }
+    }
+
+    console.log(`[Batch] Done — ${answerList.length} answers checked, ${invalidCount} invalidated, ${funnyResult.length} funny words saved`);
+
+  } catch (e) {
+    console.error('[Batch] Processing error:', e.message);
+    pendingBatch.unshift(...batch); // re-queue for next cycle
+    dailyApiCalls = Math.max(0, dailyApiCalls - 1);
+  }
+}
+
+// ─── Smart join ───────────────────────────────────────────────
+function findBestPublicRoom() {
   return Array.from(rooms.values())
-    .filter(r => r.isPublic && r.state === 'waiting' && r.players.size < r.maxPlayers)
-    .filter(r => !exclude || r.host !== exclude)
+    .filter(r => r.isPublic && !r.isCompetitive && r.state === 'waiting' && r.players.size < r.maxPlayers)
     .sort((a, b) => (b.players.size / b.maxPlayers) - (a.players.size / a.maxPlayers))[0] || null;
 }
 
-// ─── Socket events ───────────────────────────────────────────
+// ─── Shared leave/disconnect handler ─────────────────────────
+async function handlePlayerLeave(socket, room, code) {
+  const player = room.players.get(socket.id);
+  if (!player) return;
+  const name      = player.name;
+  const wasInGame = ['playing','ai_scoring','evaluating','scoring'].includes(room.state);
+
+  if (room.isCompetitive && wasInGame && player.playerId)
+    savePlayerScore(player.playerId, player.score, player.name, player.country || '');
+
+  room.players.delete(socket.id);
+
+  if (room.players.size === 0) {
+    clearInterval(room.timer); clearInterval(room.autoTimer); clearInterval(room.evalTimer);
+    if (room.compStartTimer) { clearInterval(room.compStartTimer); room.compStartTimer = null; }
+    rooms.delete(code);
+    io.emit('rooms:updated');
+    return;
+  }
+
+  // Cancel competitive countdown if we drop below required players
+  if (room.isCompetitive && room.compStartTimer && room.players.size < COMP_PLAYERS) {
+    clearInterval(room.compStartTimer);
+    room.compStartTimer = null;
+    io.to(code).emit('competitive:wait');
+  }
+
+  if (room.host === socket.id) {
+    room.host = room.players.keys().next().value;
+    io.to(code).emit('host:changed', { newHost: room.host, newHostName: room.players.get(room.host)?.name });
+  }
+
+  io.to(code).emit('player:left', { id: socket.id, name, ...publicRoom(room) });
+
+  if (room.state === 'playing' && !room.submissions.has(socket.id)) {
+    room.submissions.set(socket.id, { name:'', place:'', animal:'', thing:'', submittedAt: Date.now() });
+    room.submissionOrder.push(socket.id);
+    if (room.submissions.size >= room.players.size) endRound(room);
+  }
+
+  if (room.state === 'evaluating') {
+    room.evalDone.delete(socket.id);
+    if (room.evalDone.size >= room.players.size) {
+      clearInterval(room.evalTimer);
+      finalizeEvaluation(room);
+    }
+  }
+
+  if (room.isPublic && room.state === 'waiting') io.emit('rooms:updated');
+}
+
+// ─── Socket events ────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log('[+]', socket.id);
 
@@ -389,6 +880,7 @@ io.on('connection', (socket) => {
     if (!name || !code) return socket.emit('err', 'Name and room code required');
     const room = rooms.get(code);
     if (!room)                    return socket.emit('err', 'Room not found — check the code');
+    if (room.isCompetitive)       return socket.emit('err', 'Use Competitive mode to join this match');
     if (room.state !== 'waiting') return socket.emit('err', 'Game already in progress');
     if (room.players.size >= room.maxPlayers) return socket.emit('err', `Room is full (max ${room.maxPlayers})`);
     if (Array.from(room.players.values()).some(p => p.name.toLowerCase() === name.toLowerCase()))
@@ -400,23 +892,19 @@ io.on('connection', (socket) => {
     if (room.isPublic) io.emit('rooms:updated');
   });
 
-  // Smart quick-join: finds the most-populated public waiting room
   socket.on('room:quick-join', ({ name, avatar }) => {
     name = (name || '').trim();
     if (!name) return socket.emit('err', 'Name is required');
     const best = findBestPublicRoom();
     if (!best) {
-      // No suitable room — create a default public one
       const room = makeRoom(socket.id, name, avatar || '🦁', { isPublic: true });
       socket.join(room.code);
       socket.emit('room:joined', { isHost: true, quickJoinCreated: true, ...publicRoom(room) });
       io.emit('rooms:updated');
       return;
     }
-    if (Array.from(best.players.values()).some(p => p.name.toLowerCase() === name.toLowerCase())) {
-      // Name collision — still join but note it
+    if (Array.from(best.players.values()).some(p => p.name.toLowerCase() === name.toLowerCase()))
       return socket.emit('err', 'That name is taken in the best available room. Try another name.');
-    }
     best.players.set(socket.id, { name, score: 0, avatar: avatar || '🦁' });
     socket.join(best.code);
     socket.emit('room:joined', { isHost: false, ...publicRoom(best) });
@@ -424,34 +912,68 @@ io.on('connection', (socket) => {
     io.emit('rooms:updated');
   });
 
-  // Competitive mode: fixed settings, random matchmaking, scores saved to Supabase
-  socket.on('room:competitive-join', ({ name, avatar, country, playerId }) => {
+  socket.on('room:competitive-join', async ({ name, avatar, country, accessToken }) => {
     name    = (name    || '').trim();
     country = (country || '').trim();
-    if (!name) return socket.emit('err', 'Name is required');
+    if (!name)    return socket.emit('err', 'Name is required');
+    if (!country) return socket.emit('err', 'Country is required for Competitive mode');
+    if (!VALID_COUNTRIES.has(country))
+      return socket.emit('err', 'Please select a valid country from the dropdown');
 
-    const COMP = { isPublic: true, maxPlayers: 8, rounds: 10, timer: 30, isCompetitive: true };
+    // Auth check
+    let userId = null;
+    if (supabase) {
+      if (!accessToken)
+        return socket.emit('err', 'You must be logged in to play Competitive mode');
+      const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+      if (error || !user)
+        return socket.emit('err', 'Session expired — please sign in again');
+      userId = user.id;
+
+      // Daily limit: count matches played today
+      const today = new Date().toISOString().slice(0, 10);
+      const { count } = await supabase
+        .from('match_results')
+        .select('*', { count: 'exact', head: true })
+        .eq('player_id', userId)
+        .gte('played_at', `${today}T00:00:00Z`);
+      if (count >= COMP_DAILY_LIMIT)
+        return socket.emit('err', `Daily limit reached (${COMP_DAILY_LIMIT} competitive matches per day). Come back tomorrow!`);
+    }
+
+    const COMP_OPTS = {
+      isPublic: false, maxPlayers: COMP_PLAYERS, rounds: COMP_ROUNDS,
+      timer: 30, isCompetitive: true,
+    };
 
     const best = Array.from(rooms.values())
-      .filter(r => r.isCompetitive && r.state === 'waiting' && r.players.size < r.maxPlayers)
+      .filter(r => r.isCompetitive && r.state === 'waiting' && r.players.size < COMP_PLAYERS)
       .sort((a, b) => (b.players.size / b.maxPlayers) - (a.players.size / a.maxPlayers))[0] || null;
 
     if (!best) {
-      const room = makeRoom(socket.id, name, avatar || '🦁', { ...COMP, country, playerId });
+      const room = makeRoom(socket.id, name, avatar || '🦁', { ...COMP_OPTS, country, playerId: userId });
       socket.join(room.code);
-      socket.emit('room:joined', { isHost: true, isCompetitive: true, ...publicRoom(room) });
-      io.emit('rooms:updated');
+      socket.emit('room:joined', { isHost: false, isCompetitive: true, ...publicRoom(room) });
       return;
     }
 
     if (Array.from(best.players.values()).some(p => p.name.toLowerCase() === name.toLowerCase()))
-      return socket.emit('err', 'That name is taken in this room. Try another name.');
+      return socket.emit('err', 'That name is taken in this match. Try another name.');
 
-    best.players.set(socket.id, { name, score: 0, avatar: avatar || '🦁', country, playerId: playerId || null });
+    best.players.set(socket.id, { name, score: 0, avatar: avatar || '🦁', country, playerId: userId });
     socket.join(best.code);
     socket.emit('room:joined', { isHost: false, isCompetitive: true, ...publicRoom(best) });
     socket.to(best.code).emit('room:update', publicRoom(best));
-    io.emit('rooms:updated');
+
+    if (best.players.size >= COMP_PLAYERS) startCompetitiveCountdown(best);
+  });
+
+  socket.on('room:leave', async ({ code }) => {
+    const room = rooms.get(code);
+    if (!room || !room.players.has(socket.id)) return;
+    socket.leave(code);
+    socket.emit('room:left');
+    await handlePlayerLeave(socket, room, code);
   });
 
   socket.on('room:set-rounds', ({ code, rounds }) => {
@@ -463,6 +985,7 @@ io.on('connection', (socket) => {
   socket.on('game:start', ({ code }) => {
     const room = rooms.get(code);
     if (!room)                    return socket.emit('err', 'Room not found');
+    if (room.isCompetitive)       return socket.emit('err', 'Competitive matches start automatically when full');
     if (room.host !== socket.id)  return socket.emit('err', 'Only the host can start');
     if (room.state !== 'waiting') return socket.emit('err', 'Game already started');
     if (room.players.size < 2)    return socket.emit('err', 'Need at least 2 players');
@@ -495,6 +1018,7 @@ io.on('connection', (socket) => {
   socket.on('round:next', ({ code }) => {
     const room = rooms.get(code);
     if (!room || room.host !== socket.id || room.state !== 'scoring') return;
+    if (room.isCompetitive) return;
     clearInterval(room.autoTimer);
     if (room.round < room.maxRounds) startRound(room);
   });
@@ -513,13 +1037,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Evaluation voting — records votes during the 60s evaluation phase
   socket.on('vote:answer', ({ code, targetPid, field, invalid }) => {
     const room = rooms.get(code);
     if (!room || room.state !== 'evaluating') return;
     if (targetPid === socket.id) return;
     if (!['name','place','animal','thing'].includes(field)) return;
-    // Only allow voting on 'needs_vote' answers
     if (room.evalData[targetPid]?.answers[field]?.status !== 'needs_vote') return;
 
     const key = `${targetPid}_${field}`;
@@ -527,16 +1049,16 @@ io.on('connection', (socket) => {
     const v = room.answerVotes.get(key);
     if (invalid) { v.up.delete(socket.id); v.down.add(socket.id); }
     else         { v.down.delete(socket.id); v.up.add(socket.id); }
-    // No live score broadcast — scores calculated at end of evaluation
   });
 
   socket.on('room:restart', ({ code }) => {
     const room = rooms.get(code);
     if (!room || room.host !== socket.id) return;
+    if (room.isCompetitive) return;
     room.players.forEach(p => { p.score = 0; });
     room.round = 0; room.state = 'waiting';
     room.usedLetters = []; room.submissions.clear(); room.submissionOrder = [];
-    room.evalDone = new Set();
+    room.evalDone = new Set(); room.roundHistory = [];
     clearInterval(room.timer); clearInterval(room.autoTimer); clearInterval(room.evalTimer);
     io.to(code).emit('room:restarted', publicRoom(room));
     if (room.isPublic) io.emit('rooms:updated');
@@ -546,49 +1068,35 @@ io.on('connection', (socket) => {
     console.log('[-]', socket.id);
     rooms.forEach((room, code) => {
       if (!room.players.has(socket.id)) return;
-      const name = room.players.get(socket.id)?.name;
-      room.players.delete(socket.id);
-
-      if (room.players.size === 0) {
-        clearInterval(room.timer); clearInterval(room.autoTimer); clearInterval(room.evalTimer);
-        rooms.delete(code);
-        io.emit('rooms:updated');
-        return;
-      }
-
-      if (room.host === socket.id) {
-        room.host = room.players.keys().next().value;
-        io.to(code).emit('host:changed', { newHost: room.host, newHostName: room.players.get(room.host)?.name });
-      }
-
-      io.to(code).emit('player:left', { id: socket.id, name, ...publicRoom(room) });
-
-      if (room.state === 'playing' && !room.submissions.has(socket.id)) {
-        room.submissions.set(socket.id, { name:'', place:'', animal:'', thing:'', submittedAt: Date.now() });
-        room.submissionOrder.push(socket.id);
-        if (room.submissions.size >= room.players.size) endRound(room);
-      }
-
-      if (room.state === 'evaluating') {
-        room.evalDone.delete(socket.id);
-        const doneCount    = room.evalDone.size;
-        const totalPlayers = room.players.size;
-        io.to(code).emit('evaluation:done:update', { doneCount, totalPlayers });
-        if (doneCount >= totalPlayers) {
-          clearInterval(room.evalTimer);
-          finalizeEvaluation(room);
-        }
-      }
-
-      if (room.isPublic && room.state === 'waiting') io.emit('rooms:updated');
+      handlePlayerLeave(socket, room, code);
     });
   });
 });
 
+// ─── Batch processing intervals ──────────────────────────────
+setInterval(processPendingBatch, BATCH_INTERVAL);
+
+// Daily API cap reset (checked every hour and also inside processPendingBatch)
+setInterval(() => {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== _lastResetDay) {
+    _lastResetDay = today;
+    dailyApiCalls = 0;
+    console.log('[Daily] Midnight reset: API call counter cleared');
+  }
+}, 60 * 60 * 1000);
+
 // ─── REST ─────────────────────────────────────────────────────
+app.get('/api/config', (req, res) => {
+  res.json({
+    supabaseUrl:     process.env.SUPABASE_URL     || null,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || null,
+  });
+});
+
 app.get('/api/rooms', (req, res) => {
   const list = Array.from(rooms.values())
-    .filter(r => r.state === 'waiting')
+    .filter(r => r.state === 'waiting' && !r.isCompetitive)
     .map(roomSummary)
     .sort((a, b) => b.playerCount - a.playerCount);
   res.json(list);
@@ -601,7 +1109,7 @@ app.get('/api/room/:code', (req, res) => {
 });
 
 app.get('/api/leaderboard', async (req, res) => {
-  res.set('Cache-Control', 'public, max-age=30'); // leaderboard cache: 30 seconds
+  res.set('Cache-Control', 'public, max-age=5');
   if (!supabase) return res.json([]);
   try {
     const country = (req.query.country || '').trim();
@@ -613,6 +1121,24 @@ app.get('/api/leaderboard', async (req, res) => {
   } catch (e) {
     console.error('[Supabase] leaderboard error:', e.message);
     res.status(500).json({ error: 'Could not load leaderboard' });
+  }
+});
+
+app.get('/api/funny-words', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=60');
+  if (!supabase) return res.json([]);
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase
+      .from('funny_words')
+      .select('*')
+      .eq('word_date', today)
+      .order('rank');
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    console.error('[Supabase] funny-words error:', e.message);
+    res.status(500).json({ error: 'Could not load funny words' });
   }
 });
 

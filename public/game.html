@@ -690,6 +690,74 @@
   #cursor-g.cursor--pointer .cursor-pencil { display:none; }
   #cursor-g.cursor--pointer .cursor-plane  { display:block; }
   #trail-canvas-g { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9998; opacity:0.35; }
+
+  /* ── COUNTRY DROPDOWN ─────────────────────────────────── */
+  .country-wrap { position:relative; }
+  .country-dd {
+    position:absolute; top:100%; left:0; right:0; background:white;
+    border:2px solid var(--b); border-top:none; z-index:50;
+    max-height:200px; overflow-y:auto; display:none;
+    box-shadow:0 4px 12px rgba(0,0,0,.12);
+  }
+  .country-dd.open { display:block; }
+  .country-dd-item {
+    padding:8px 12px; font-family:'Special Elite',cursive; font-size:15px;
+    cursor:pointer; color:var(--ink); border-bottom:1px solid #f0eee8;
+  }
+  .country-dd-item:hover { background:var(--b); color:white; }
+  .country-dd-item:last-child { border-bottom:none; }
+  .field.country-valid { border-color:var(--g); }
+  .field.country-err   { border-color:var(--r); }
+
+  /* ── AUTH SCREEN ──────────────────────────────────────── */
+  .auth-card { max-width:420px; width:100%; padding:28px 24px 36px; box-shadow:0 6px 28px rgba(0,0,0,.1); }
+  .auth-title { font-family:'Bangers',cursive; font-size:26px; letter-spacing:3px; color:var(--ink); text-align:center; margin-bottom:4px; }
+  .auth-sub { font-family:'Caveat',cursive; font-size:14px; color:#aaa; text-align:center; margin-bottom:18px; }
+  .auth-tabs { display:flex; border:3px solid var(--b); border-radius:4px; overflow:hidden; margin-bottom:18px; }
+  .auth-tab { flex:1; font-family:'Bangers',cursive; font-size:17px; letter-spacing:1px; padding:9px; border:none; cursor:pointer; background:white; color:var(--b); transition:background .15s; }
+  .auth-tab.active { background:var(--b); color:white; }
+  .auth-form-row { margin-bottom:12px; }
+  .auth-form-row .lbl { margin-bottom:4px; }
+  .auth-hint { font-family:'Caveat',cursive; font-size:12px; color:#aaa; text-align:center; margin-top:10px; }
+
+  /* ── LEAVE BUTTON ─────────────────────────────────────── */
+  .btn-leave {
+    position:fixed; top:14px; right:14px; z-index:100;
+    font-family:'Bangers',cursive; font-size:14px; letter-spacing:1px;
+    background:rgba(232,0,29,.9); color:white; border:none;
+    padding:7px 14px; cursor:pointer; border-radius:3px;
+    box-shadow:0 3px 0 #8b0000; display:none;
+    transition:transform .12s, box-shadow .12s;
+  }
+  .btn-leave:hover  { transform:translateY(-1px); box-shadow:0 4px 0 #8b0000; }
+  .btn-leave:active { transform:translateY(2px);  box-shadow:0 1px 0 #8b0000; }
+  .btn-leave.visible { display:block; }
+
+  /* ── COMPETITIVE LOBBY ────────────────────────────────── */
+  .comp-wait-bar {
+    background:var(--ink); color:white; padding:12px 16px; text-align:center;
+    margin:14px 0; border-radius:4px;
+  }
+  .comp-wait-title { font-family:'Bangers',cursive; font-size:20px; letter-spacing:2px; color:#FFD700; }
+  .comp-wait-sub { font-family:'Caveat',cursive; font-size:14px; color:rgba(255,255,255,.75); margin-top:2px; }
+  .comp-starting-pill {
+    display:inline-block; background:var(--g); color:white;
+    font-family:'Bangers',cursive; font-size:22px; letter-spacing:3px;
+    padding:6px 20px; box-shadow:0 3px 0 #007a30; margin-top:8px;
+  }
+
+  /* ── AI SCORING OVERLAY ───────────────────────────────── */
+  .ai-overlay {
+    position:fixed; inset:0; background:rgba(26,26,46,.85);
+    display:none; align-items:center; justify-content:center;
+    z-index:150; flex-direction:column; gap:12px; text-align:center;
+    backdrop-filter:blur(6px);
+  }
+  .ai-overlay.show { display:flex; }
+  .ai-spinner { font-size:48px; animation:spin 1.2s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .ai-overlay-txt { font-family:'Bangers',cursive; font-size:26px; letter-spacing:3px; color:white; }
+  .ai-overlay-sub { font-family:'Caveat',cursive; font-size:15px; color:rgba(255,255,255,.7); }
 </style>
 </head>
 <body>
@@ -744,23 +812,11 @@
 
     <div style="margin-bottom:6px">
       <label class="lbl">Country <span style="font-size:12px;opacity:0.5;font-weight:400">(required for Competitive)</span></label>
-      <input class="field" id="inp-country" type="text" placeholder="e.g. India, USA, UK" maxlength="30" autocomplete="off" list="country-datalist">
-      <datalist id="country-datalist">
-        <option value="India"><option value="USA"><option value="United Kingdom">
-        <option value="Australia"><option value="Canada"><option value="Germany">
-        <option value="France"><option value="Japan"><option value="Brazil">
-        <option value="Spain"><option value="Italy"><option value="Mexico">
-        <option value="Russia"><option value="South Korea"><option value="Netherlands">
-        <option value="Sweden"><option value="Pakistan"><option value="Bangladesh">
-        <option value="Nigeria"><option value="South Africa"><option value="Indonesia">
-        <option value="Philippines"><option value="Malaysia"><option value="Singapore">
-        <option value="New Zealand"><option value="Ireland"><option value="Turkey">
-        <option value="Ukraine"><option value="Argentina"><option value="Colombia">
-        <option value="Thailand"><option value="Vietnam"><option value="Egypt">
-        <option value="Saudi Arabia"><option value="UAE"><option value="Kenya">
-        <option value="Ghana"><option value="Nepal"><option value="Sri Lanka">
-        <option value="Israel"><option value="Greece"><option value="Poland">
-      </datalist>
+      <div class="country-wrap">
+        <input class="field" id="inp-country" type="text" placeholder="Type to search country..." maxlength="40" autocomplete="off">
+        <div class="country-dd" id="country-dd"></div>
+      </div>
+      <p class="err" id="country-err" style="font-size:12px;min-height:0"></p>
     </div>
 
     <label class="lbl" style="margin-top:14px">Choose Your Character</label>
@@ -795,6 +851,52 @@
       <span class="mb-ico">🔑</span> JOIN WITH CODE
     </button>
     <p class="err" id="join-err"></p>
+  </div>
+</div>
+
+<!-- ── AUTH ─────────────────────────────────────────────────── -->
+<div class="screen" id="screen-auth">
+  <a href="#" class="back" onclick="show('menu');return false">← Back</a>
+  <div class="torn auth-card">
+    <div class="auth-title">🏆 COMPETITIVE</div>
+    <div class="auth-sub">Sign in to play ranked matches</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Log In</button>
+      <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+    </div>
+
+    <!-- Login form -->
+    <div id="auth-login-form">
+      <div class="auth-form-row">
+        <label class="lbl">Email</label>
+        <input class="field" id="li-email" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="auth-form-row">
+        <label class="lbl">Password</label>
+        <input class="field" id="li-password" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn-blue" style="width:100%;font-size:19px;margin-top:6px" onclick="doLogin()">LOG IN →</button>
+    </div>
+
+    <!-- Signup form -->
+    <div id="auth-signup-form" style="display:none">
+      <div class="auth-form-row">
+        <label class="lbl">Email</label>
+        <input class="field" id="su-email" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="auth-form-row">
+        <label class="lbl">Password <span style="font-size:11px;opacity:.6">(min 6 chars)</span></label>
+        <input class="field" id="su-password" type="password" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <div class="auth-form-row">
+        <label class="lbl">Confirm Password</label>
+        <input class="field" id="su-confirm" type="password" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <button class="btn-blue" style="width:100%;font-size:19px;margin-top:6px" onclick="doSignup()">CREATE ACCOUNT →</button>
+    </div>
+
+    <p class="err" id="auth-err" style="margin-top:10px"></p>
+    <p class="auth-hint">Your game display name is set on the previous screen.</p>
   </div>
 </div>
 
@@ -892,11 +994,19 @@
 
     <p class="lobby-status" id="lobby-status">Waiting for players...</p>
 
+    <!-- Regular game: host start button -->
     <div id="start-row" style="display:none;text-align:center">
       <button class="btn-red" style="min-width:200px;font-size:20px" onclick="startGame()">START GAME</button>
       <p class="need-note" id="need-note"></p>
     </div>
     <p class="need-note" id="wait-host" style="display:none;text-align:center">Waiting for host to start...</p>
+
+    <!-- Competitive: wait / countdown display -->
+    <div id="comp-wait-bar" style="display:none" class="comp-wait-bar">
+      <div class="comp-wait-title" id="comp-wait-title">WAITING FOR PLAYERS</div>
+      <div class="comp-wait-sub" id="comp-wait-sub">Match starts when 8 players join</div>
+      <div id="comp-starting-pill" style="display:none" class="comp-starting-pill">STARTING IN <span id="comp-cd">10</span>s</div>
+    </div>
   </div>
 </div>
 
@@ -982,6 +1092,11 @@
   <div class="sc-wrap">
     <h2 class="sc-title">ROUND RESULTS</h2>
     <p class="sc-meta" id="sc-meta">Letter N — Round 1/5</p>
+
+    <!-- AI pending notice (shown for competitive provisional scores) -->
+    <div id="ai-pending-notice" style="display:none;text-align:center;font-family:'Caveat',cursive;font-size:14px;color:#e88600;background:rgba(255,140,0,.1);border:1px solid rgba(255,140,0,.3);padding:6px 14px;border-radius:4px;margin-bottom:10px">
+      ⏳ Provisional scores — AI validation in progress (updates within 5 min)
+    </div>
 
     <!-- Challenge result banner -->
     <div class="ch-banner" id="ch-banner">
@@ -1082,10 +1197,93 @@
   </div>
 </div>
 
+<!-- LEAVE CONFIRM OVERLAY -->
+<div class="overlay" id="ov-leave">
+  <div class="ov-box">
+    <div class="ov-title">Leave Game?</div>
+    <p class="ov-msg" id="leave-msg">You will be removed from this match.</p>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="btn-red" style="flex:1;font-size:17px" onclick="confirmLeave()">LEAVE</button>
+      <button class="btn-out" style="flex:1" onclick="cancelLeave()">Stay</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI SCORING OVERLAY -->
+<div class="ai-overlay" id="ai-overlay">
+  <div class="ai-spinner">🤖</div>
+  <div class="ai-overlay-txt">AI IS SCORING</div>
+  <div class="ai-overlay-sub">Validating your answers...</div>
+</div>
+
+<!-- Floating leave button (shown during active game) -->
+<button class="btn-leave" id="btn-leave" onclick="promptLeave()">✕ LEAVE</button>
+
 <div id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
+// ── Country list ──────────────────────────────────────────────
+const COUNTRIES = [
+  'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda',
+  'Argentina','Armenia','Australia','Austria','Azerbaijan',
+  'Bahamas','Bahrain','Bangladesh','Barbados','Belarus','Belgium','Belize',
+  'Benin','Bhutan','Bolivia','Bosnia and Herzegovina','Botswana','Brazil',
+  'Brunei','Bulgaria','Burkina Faso','Burundi',
+  'Cabo Verde','Cambodia','Cameroon','Canada','Central African Republic','Chad',
+  'Chile','China','Colombia','Comoros','Congo','Costa Rica','Croatia','Cuba','Cyprus',
+  'Czech Republic',
+  'DR Congo','Denmark','Djibouti','Dominica','Dominican Republic',
+  'Ecuador','Egypt','El Salvador','Equatorial Guinea','Eritrea','Estonia','Eswatini','Ethiopia',
+  'Fiji','Finland','France',
+  'Gabon','Gambia','Georgia','Germany','Ghana','Greece','Grenada','Guatemala','Guinea',
+  'Guinea-Bissau','Guyana',
+  'Haiti','Honduras','Hungary',
+  'Iceland','India','Indonesia','Iran','Iraq','Ireland','Israel','Italy',
+  'Jamaica','Japan','Jordan',
+  'Kazakhstan','Kenya','Kiribati','Kuwait','Kyrgyzstan',
+  'Laos','Latvia','Lebanon','Lesotho','Liberia','Libya','Liechtenstein','Lithuania','Luxembourg',
+  'Madagascar','Malawi','Malaysia','Maldives','Mali','Malta','Marshall Islands','Mauritania',
+  'Mauritius','Mexico','Micronesia','Moldova','Monaco','Mongolia','Montenegro','Morocco',
+  'Mozambique','Myanmar',
+  'Namibia','Nauru','Nepal','Netherlands','New Zealand','Nicaragua','Niger','Nigeria',
+  'North Korea','North Macedonia','Norway',
+  'Oman',
+  'Pakistan','Palau','Panama','Papua New Guinea','Paraguay','Peru','Philippines',
+  'Poland','Portugal',
+  'Qatar',
+  'Romania','Russia','Rwanda',
+  'Saint Kitts and Nevis','Saint Lucia','Saint Vincent and the Grenadines','Samoa',
+  'San Marino','Sao Tome and Principe','Saudi Arabia','Senegal','Serbia','Seychelles',
+  'Sierra Leone','Singapore','Slovakia','Slovenia','Solomon Islands','Somalia',
+  'South Africa','South Korea','South Sudan','Spain','Sri Lanka','Sudan','Suriname',
+  'Sweden','Switzerland','Syria',
+  'Taiwan','Tajikistan','Tanzania','Thailand','Timor-Leste','Togo','Tonga',
+  'Trinidad and Tobago','Tunisia','Turkey','Turkmenistan','Tuvalu',
+  'Uganda','Ukraine','United Arab Emirates','United Kingdom','United States','Uruguay','Uzbekistan',
+  'Vanuatu','Vatican City','Venezuela','Vietnam',
+  'Yemen','Zambia','Zimbabwe',
+  'USA','UK','UAE',
+];
+let _countryValid = false;
+
+// ── Supabase auth ──────────────────────────────────────────────
+let _supabase = null;
+let _authSession = null;
+
+async function initSupabase() {
+  try {
+    const res  = await fetch('/api/config');
+    const cfg  = await res.json();
+    if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) return;
+    _supabase = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    const { data: { session } } = await _supabase.auth.getSession();
+    _authSession = session;
+    _supabase.auth.onAuthStateChange((_, sess) => { _authSession = sess; });
+  } catch(e) { /* Supabase not configured */ }
+}
+
 // ── Player identity (persists across sessions via localStorage) ──
 function getPlayerId() {
   let id = localStorage.getItem('npat_player_id');
@@ -1124,10 +1322,13 @@ const CHARS = [
 ];
 
 // ── Screens ───────────────────────────────────────────────────
+const LEAVE_SCREENS = new Set(['lobby','game','evaluation','scoring']);
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
   window.scrollTo(0,0);
+  const lb = document.getElementById('btn-leave');
+  if (lb) lb.classList.toggle('visible', LEAVE_SCREENS.has(id) && !!S.code);
 }
 
 // ── Toast ─────────────────────────────────────────────────────
@@ -1156,8 +1357,13 @@ function selAv(i) {
 function continueToMenu() {
   const n = document.getElementById('inp-name').value.trim();
   if (!n) { document.getElementById('profile-err').textContent = 'Enter your name first!'; return; }
+  const countryVal = document.getElementById('inp-country').value.trim();
+  if (countryVal && !_countryValid) {
+    document.getElementById('profile-err').textContent = 'Please select a valid country from the dropdown (or leave it blank)';
+    return;
+  }
   S.myName = n;
-  S.myCountry = document.getElementById('inp-country').value.trim();
+  S.myCountry = countryVal;
   document.getElementById('profile-err').textContent = '';
   const ch = CHARS.find(c => c.emoji === S.myAvatar) || CHARS[0];
   const big = document.getElementById('menu-av-big');
@@ -1166,6 +1372,108 @@ function continueToMenu() {
   show('menu');
 }
 document.getElementById('inp-name').addEventListener('keydown', e => { if(e.key==='Enter') continueToMenu(); });
+
+// ── Country dropdown ──────────────────────────────────────────
+(function(){
+  const inp = document.getElementById('inp-country');
+  const dd  = document.getElementById('country-dd');
+
+  function showSuggestions(val) {
+    if (!val) { dd.classList.remove('open'); return; }
+    const lo = val.toLowerCase();
+    const starts  = COUNTRIES.filter(c => c.toLowerCase().startsWith(lo));
+    const contains = COUNTRIES.filter(c => !c.toLowerCase().startsWith(lo) && c.toLowerCase().includes(lo));
+    const matches = [...starts, ...contains].slice(0, 8);
+    if (!matches.length) { dd.classList.remove('open'); return; }
+    dd.innerHTML = matches.map(c =>
+      `<div class="country-dd-item" onmousedown="selectCountry('${c.replace(/'/g,"\\'")}')">` +
+      `${c.replace(new RegExp(val.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'), m => `<strong>${m}</strong>`)}</div>`
+    ).join('');
+    dd.classList.add('open');
+  }
+
+  inp.addEventListener('input', function() {
+    _countryValid = false;
+    inp.classList.remove('country-valid','country-err');
+    showSuggestions(this.value.trim());
+  });
+  inp.addEventListener('focus', function() { if(this.value.trim()) showSuggestions(this.value.trim()); });
+  inp.addEventListener('blur', function() {
+    setTimeout(() => {
+      dd.classList.remove('open');
+      const v = inp.value.trim();
+      if (v && !_countryValid) { inp.classList.add('country-err'); }
+    }, 200);
+  });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { dd.classList.remove('open'); inp.blur(); }
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.country-wrap')) dd.classList.remove('open');
+  });
+})();
+
+function selectCountry(name) {
+  document.getElementById('inp-country').value = name;
+  document.getElementById('country-dd').classList.remove('open');
+  document.getElementById('country-err').textContent = '';
+  _countryValid = true;
+  document.getElementById('inp-country').classList.remove('country-err');
+  document.getElementById('inp-country').classList.add('country-valid');
+}
+
+// ── Auth (Supabase) ───────────────────────────────────────────
+function switchAuthTab(tab) {
+  const isLogin = tab === 'login';
+  document.getElementById('auth-login-form').style.display  = isLogin ? '' : 'none';
+  document.getElementById('auth-signup-form').style.display = isLogin ? 'none' : '';
+  document.getElementById('tab-login').classList.toggle('active',  isLogin);
+  document.getElementById('tab-signup').classList.toggle('active', !isLogin);
+  document.getElementById('auth-err').textContent = '';
+}
+
+async function doLogin() {
+  if (!_supabase) return socket_competitiveJoinDirect(); // no auth configured
+  const email = document.getElementById('li-email').value.trim();
+  const pass  = document.getElementById('li-password').value;
+  if (!email || !pass) { document.getElementById('auth-err').textContent = 'Enter email and password'; return; }
+  document.getElementById('auth-err').textContent = 'Signing in...';
+  const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pass });
+  if (error) { document.getElementById('auth-err').textContent = error.message; return; }
+  _authSession = data.session;
+  document.getElementById('auth-err').textContent = '';
+  toast('✅ Signed in! Joining competitive queue...');
+  socket_competitiveJoinDirect();
+}
+
+async function doSignup() {
+  if (!_supabase) return socket_competitiveJoinDirect();
+  const email   = document.getElementById('su-email').value.trim();
+  const pass    = document.getElementById('su-password').value;
+  const confirm = document.getElementById('su-confirm').value;
+  if (!email || !pass) { document.getElementById('auth-err').textContent = 'Enter email and password'; return; }
+  if (pass !== confirm) { document.getElementById('auth-err').textContent = 'Passwords do not match'; return; }
+  if (pass.length < 6)  { document.getElementById('auth-err').textContent = 'Password must be at least 6 characters'; return; }
+  document.getElementById('auth-err').textContent = 'Creating account...';
+  const { data, error } = await _supabase.auth.signUp({ email, password: pass, options: { data: { username: S.myName } } });
+  if (error) { document.getElementById('auth-err').textContent = error.message; return; }
+  _authSession = data.session;
+  document.getElementById('auth-err').textContent = '';
+  if (!_authSession) {
+    document.getElementById('auth-err').style.color = 'var(--g)';
+    document.getElementById('auth-err').textContent = '✅ Account created! Check your email to confirm, then log in.';
+    return;
+  }
+  toast('✅ Account created! Joining competitive queue...');
+  socket_competitiveJoinDirect();
+}
+
+function socket_competitiveJoinDirect() {
+  show('menu');
+  stopBrowse();
+  const token = _authSession?.access_token || null;
+  S.socket.emit('room:competitive-join', { name: S.myName, avatar: S.myAvatar, country: S.myCountry, accessToken: token });
+}
 
 // ── Create screen ─────────────────────────────────────────────
 const createOpts = { isPublic:true, maxPlayers:8, rounds:10, timer:30 };
@@ -1257,7 +1565,12 @@ function competitiveJoin() {
     toast('⚠ Country required for Competitive mode'); return;
   }
   stopBrowse();
-  S.socket.emit('room:competitive-join', { name:S.myName, avatar:S.myAvatar, country:S.myCountry, playerId:S.myPlayerId });
+  // Require auth if Supabase is configured
+  if (_supabase && !_authSession) {
+    show('auth');
+    return;
+  }
+  socket_competitiveJoinDirect();
 }
 
 document.getElementById('priv-code-inp').addEventListener('keydown', e => { if(e.key==='Enter') confirmPrivateJoin(); });
@@ -1277,11 +1590,12 @@ function connect() {
   });
   s.on('room:joined', d => {
     stopBrowse();
-    S.code=d.code; S.isHost=d.isHost||d.host===s.id;
+    S.code=d.code;
     S.isCompetitive = d.isCompetitive || false;
+    S.isHost = S.isCompetitive ? false : (d.isHost || d.host === s.id);
     show('lobby'); renderLobby(d);
     if(d.quickJoinCreated) toast('No open rooms — created a new one! Share the code.');
-    if(S.isCompetitive) toast('🏆 Competitive room — scores will be saved globally!');
+    if(S.isCompetitive) toast('🏆 Joined competitive queue! Waiting for 8 players...');
   });
   s.on('room:update',   d => renderLobby(d));
   s.on('player:joined', d => { renderLobby(d); toast(d.name+' joined! 👋'); });
@@ -1303,6 +1617,7 @@ function connect() {
     el.style.animation='cd-pop .8s cubic-bezier(.36,.07,.19,.97)';
   });
   s.on('round:start', d => {
+    hideAIOverlay();
     S.letter=d.letter; S.round=d.round; S.submitted=false;
     TOTAL = d.roundTime || 30; S.roundTime = TOTAL;
     myVotes.clear();
@@ -1323,18 +1638,82 @@ function connect() {
   });
   s.on('evaluation:start', d => { show('evaluation'); renderEvaluation(d); });
   s.on('evaluation:tick',  ({timeLeft}) => tickEvalTimer(timeLeft));
-  s.on('round:end', d => { show('scoring'); renderScoring(d); });
   s.on('evaluation:done:update', ({ doneCount, totalPlayers }) => {
     const el = document.getElementById('eval-done-count');
     if (el) { el.style.display = 'inline'; el.textContent = `${doneCount}/${totalPlayers} ready`; }
   });
   s.on('auto:advance', ({seconds}) => startAutoBar(seconds));
   s.on('auto:tick',    ({seconds}) => tickAutoBar(seconds));
-  s.on('game:over',    d => { show('gameover'); renderGameOver(d.leaderboard); launchConfetti(d.leaderboard); });
+  s.on('game:over',    d => {
+    hideAIOverlay();
+    show('gameover'); renderGameOver(d.leaderboard); launchConfetti(d.leaderboard);
+  });
   s.on('room:restarted', d => { S.isHost=d.host===s.id; show('lobby'); renderLobby(d); stopConfetti(); });
+
+  // Competitive events
+  s.on('competitive:countdown', ({ count }) => {
+    const pill = document.getElementById('comp-starting-pill');
+    const cd   = document.getElementById('comp-cd');
+    if (pill) { pill.style.display = 'inline-block'; }
+    if (cd)   { cd.textContent = count; }
+    const sub = document.getElementById('comp-wait-sub');
+    if (sub) sub.textContent = 'Game starting in...';
+  });
+  s.on('competitive:wait', () => {
+    const pill = document.getElementById('comp-starting-pill');
+    if (pill) pill.style.display = 'none';
+    const sub = document.getElementById('comp-wait-sub');
+    if (sub) sub.textContent = 'A player left — waiting for 8 players again';
+    toast('⚠ A player left — waiting for full lobby...');
+  });
+  s.on('ai:scoring', () => {
+    // AI scoring is now batched in background — no blocking overlay
+  });
+  s.on('round:end', d => {
+    hideAIOverlay();
+    show('scoring'); renderScoring(d);
+  });
+  s.on('scores:patched', ({ scores }) => {
+    const notice = document.getElementById('ai-pending-notice');
+    if (notice && notice.style.display !== 'none') {
+      notice.innerHTML = '✅ Scores updated by AI validation';
+      notice.style.background = 'rgba(0,196,79,.12)';
+      notice.style.borderColor = 'var(--g)';
+      notice.style.color = '#007a30';
+      setTimeout(() => { notice.style.display = 'none'; }, 4000);
+    }
+    toast('📊 Scores have been AI-validated and updated on the leaderboard!');
+  });
+  s.on('room:left', () => {
+    S.code = null; S.isHost = false; S.isCompetitive = false;
+    hideAIOverlay();
+    show('menu');
+    toast('You left the game.');
+  });
 }
+// ── Leave game ────────────────────────────────────────────────
+function promptLeave() {
+  const msg = S.isCompetitive
+    ? 'Your score so far will be saved and this match will count toward your daily limit.'
+    : 'You will be removed from the current game.';
+  document.getElementById('leave-msg').textContent = msg;
+  document.getElementById('ov-leave').classList.add('show');
+}
+function cancelLeave() {
+  document.getElementById('ov-leave').classList.remove('show');
+}
+function confirmLeave() {
+  document.getElementById('ov-leave').classList.remove('show');
+  if (S.code) S.socket.emit('room:leave', { code: S.code });
+}
+
+// ── AI scoring overlay ────────────────────────────────────────
+function showAIOverlay() { document.getElementById('ai-overlay').classList.add('show'); }
+function hideAIOverlay() { document.getElementById('ai-overlay').classList.remove('show'); }
+
 connect();
 buildAvatarGrid();
+initSupabase();
 
 // ── Lobby ─────────────────────────────────────────────────────
 function renderLobby(d) {
@@ -1360,24 +1739,43 @@ function renderLobby(d) {
     </div>`;
   }).join('');
 
-  const startRow = document.getElementById('start-row');
-  const waitHost = document.getElementById('wait-host');
-  const status   = document.getElementById('lobby-status');
-  const noteEl   = document.getElementById('need-note');
+  const startRow   = document.getElementById('start-row');
+  const waitHost   = document.getElementById('wait-host');
+  const status     = document.getElementById('lobby-status');
+  const noteEl     = document.getElementById('need-note');
+  const compBar    = document.getElementById('comp-wait-bar');
+  const codeBox    = document.getElementById('lobby-code');
 
-  if (S.isHost) {
-    waitHost.style.display='none';
-    if (d.players.length < 2) {
-      startRow.style.display='none'; status.style.display='block';
-      status.textContent='Waiting for at least 1 more player...';
-    } else {
-      startRow.style.display='block'; status.style.display='none';
-      noteEl.textContent=`${d.players.length}/${d.maxPlayers} players · ${d.maxRounds} rounds · ${tl}/round`;
-    }
+  if (d.isCompetitive) {
+    startRow.style.display = 'none';
+    waitHost.style.display = 'none';
+    status.style.display   = 'none';
+    compBar.style.display  = 'block';
+    // Hide the room code for competitive (matchmaking only)
+    if (codeBox) codeBox.style.visibility = 'hidden';
+    document.getElementById('comp-wait-title').textContent =
+      `${d.players.length}/${d.maxPlayers} PLAYERS`;
+    document.getElementById('comp-wait-sub').textContent =
+      d.players.length < d.maxPlayers
+        ? `Match starts automatically when 8 players join`
+        : `Match starting soon...`;
   } else {
-    startRow.style.display='none'; waitHost.style.display='block';
-    status.style.display='block';
-    status.textContent=`${d.players.length}/${d.maxPlayers} players in room`;
+    compBar.style.display = 'none';
+    if (codeBox) codeBox.style.visibility = '';
+    if (S.isHost) {
+      waitHost.style.display='none';
+      if (d.players.length < 2) {
+        startRow.style.display='none'; status.style.display='block';
+        status.textContent='Waiting for at least 1 more player...';
+      } else {
+        startRow.style.display='block'; status.style.display='none';
+        noteEl.textContent=`${d.players.length}/${d.maxPlayers} players · ${d.maxRounds} rounds · ${tl}/round`;
+      }
+    } else {
+      startRow.style.display='none'; waitHost.style.display='block';
+      status.style.display='block';
+      status.textContent=`${d.players.length}/${d.maxPlayers} players in room`;
+    }
   }
 }
 
@@ -1577,12 +1975,15 @@ function buildScoreTable(scores) {
   }).join('');
 }
 
-function renderScoring({scores,leaderboard,round,maxRounds,isLastRound}) {
+function renderScoring({scores,leaderboard,round,maxRounds,isLastRound,aiScored}) {
   _currentScores = scores;
   document.getElementById('sc-meta').textContent=`Letter ${S.letter} — Round ${round}/${maxRounds}`;
   document.getElementById('sc-tbody').innerHTML=buildScoreTable(scores);
   renderLB('sc-lb',leaderboard);
   if (isLastRound) { document.getElementById('auto-bar').style.display='none'; }
+  // Show provisional notice for competitive matches
+  const notice = document.getElementById('ai-pending-notice');
+  if (notice) notice.style.display = (S.isCompetitive && aiScored === false) ? 'block' : 'none';
 }
 
 

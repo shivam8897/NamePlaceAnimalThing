@@ -8,6 +8,7 @@
     "dev": "npx nodemon server.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.97.1",
     "@supabase/supabase-js": "^2.105.4",
     "compression": "^1.8.1",
     "dotenv": "^17.4.2",

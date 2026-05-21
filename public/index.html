@@ -308,6 +308,37 @@
 
   footer { text-align: center; padding: 32px; font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 15px; color: #aaa; border-top: 1px solid var(--line-blue); }
 
+  /* FUNNY WORDS */
+  .fw-section { padding: 60px 0 20px; }
+  .fw-grid { display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; max-width: 900px; margin: 0 auto; }
+  .fw-card {
+    position: relative; background: white; padding: 22px 22px 28px; min-width: 200px; max-width: 260px;
+    flex: 1; text-align: center;
+    border-top: 4px solid var(--orange);
+    box-shadow: -3px 5px 0 rgba(255,107,0,.12), 4px 5px 18px rgba(255,107,0,.08);
+    transform: rotate(-1deg);
+    transition: transform .3s, box-shadow .3s;
+  }
+  .fw-card:nth-child(2) { transform: rotate(0.8deg); border-top-color: var(--crimson); box-shadow: -3px 5px 0 rgba(232,0,29,.12), 4px 5px 18px rgba(232,0,29,.08); }
+  .fw-card:nth-child(3) { transform: rotate(-0.5deg); border-top-color: var(--cobalt); box-shadow: -3px 5px 0 rgba(26,58,255,.12), 4px 5px 18px rgba(26,58,255,.08); }
+  .fw-card:hover { transform: rotate(0deg) translateY(-6px) !important; box-shadow: 0 14px 36px rgba(0,0,0,.13) !important; }
+  .fw-card::before { content: ''; position: absolute; top: -18px; left: 0; right: 0; height: 22px; background: white; clip-path: polygon(0% 100%, 3% 40%, 6% 80%, 9% 20%, 12% 60%, 15% 10%, 18% 50%, 21% 0%, 24% 40%, 27% 80%, 30% 20%, 33% 70%, 36% 15%, 39% 55%, 42% 5%, 45% 45%, 48% 85%, 51% 25%, 54% 65%, 57% 10%, 60% 50%, 63% 90%, 66% 30%, 69% 70%, 72% 15%, 75% 55%, 78% 0%, 81% 40%, 84% 80%, 87% 20%, 90% 60%, 93% 10%, 96% 50%, 100% 20%, 100% 100%); }
+  .fw-rank-badge {
+    position: absolute; top: -12px; right: 14px;
+    width: 26px; height: 26px; border-radius: 50%;
+    font-family: 'Bangers', cursive; font-size: 14px; color: white;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--orange); box-shadow: 0 2px 4px rgba(0,0,0,.2);
+  }
+  .fw-card:nth-child(2) .fw-rank-badge { background: var(--crimson); }
+  .fw-card:nth-child(3) .fw-rank-badge { background: var(--cobalt); }
+  .fw-answer { font-family: 'Permanent Marker', cursive; font-size: 26px; color: var(--ink); margin-bottom: 4px; }
+  .fw-cat { font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 12px; color: #aaa; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+  .fw-reason { font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 14px; color: #666; font-style: italic; line-height: 1.4; margin-bottom: 10px; }
+  .fw-player { font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 12px; color: #bbb; }
+  .fw-empty { text-align: center; padding: 40px 20px; color: #ccc; font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-size: 15px; }
+  .lb-pending { font-size: 13px; opacity: 0.7; margin-left: 4px; }
+
   @media (max-width: 700px) {
     /* Remove the red margin line — it sits at 68px but mobile padding is much smaller */
     .notebook-bg {
@@ -542,6 +573,20 @@
   </div>
 </section>
 
+<!-- FUNNY WORDS OF THE DAY -->
+<section class="fw-section" id="funny-words">
+  <div class="page-wrap">
+    <p class="section-label">— Players Said What?! —</p>
+    <h2 class="section-title reveal">😂 Today's <span class="highlight">Funniest Answers</span></h2>
+    <p style="text-align:center;color:#888;font-size:15px;margin-bottom:32px">
+      AI picks the most creative answers from competitive matches each day. Resets at midnight.
+    </p>
+    <div id="fw-cards" class="fw-grid reveal">
+      <div class="fw-empty">Play a competitive match today to unlock funny words!</div>
+    </div>
+  </div>
+</section>
+
 <!-- LEADERBOARD -->
 <section class="lb-section" id="leaderboard">
   <div class="page-wrap">
@@ -554,7 +599,7 @@
       <div class="lb-head">
         <div>
           <div class="lb-head-title">🏆 TOP PLAYERS WORLDWIDE</div>
-          <div class="lb-head-sub">Updated every 30 seconds</div>
+          <div class="lb-head-sub">Auto-refreshes every 5 seconds</div>
         </div>
         <input class="lb-filter-inp" id="lb-filter" type="text" placeholder="🌍 Filter by country..." maxlength="30">
       </div>
@@ -684,7 +729,7 @@
           ${p.country?`<div class="lb-ctry">${esc(p.country)}</div>`:''}
         </div>
         <div class="lb-right">
-          <div class="lb-pts">${Number(p.total_score).toLocaleString()} <span style="font-size:14px;font-family:'Comic Neue',cursive;letter-spacing:0">pts</span></div>
+          <div class="lb-pts">${Number(p.total_score).toLocaleString()} <span style="font-size:14px;font-family:'Comic Neue',cursive;letter-spacing:0">pts</span>${p.all_ai_scored===false?'<span class="lb-pending" title="Score pending AI validation">⏳</span>':''}</div>
           <div class="lb-meta">${p.matches} match${p.matches===1?'':'es'} · best ${p.best_score}</div>
         </div>
       </div>`).join('');
@@ -703,7 +748,36 @@
 
   document.getElementById('lb-filter').addEventListener('input', e => { _lbFilter = e.target.value; renderLB(); });
   loadLB();
-  setInterval(loadLB, 30000);
+  setInterval(loadLB, 5000);
+
+  // ── Funny Words of the Day ───────────────────────────────────
+  const FW_FIELD_ICON = { name:'👑', place:'🌍', animal:'🐻', thing:'⚡' };
+  const FW_RANK_LABEL = ['#1', '#2', '#3'];
+  function esc2(s){ return esc(s); }
+
+  async function loadFunnyWords() {
+    try {
+      const r = await fetch('/api/funny-words');
+      if (!r.ok) return;
+      const words = await r.json();
+      const container = document.getElementById('fw-cards');
+      if (!container) return;
+      if (!words.length) {
+        container.innerHTML = '<div class="fw-empty">Play a competitive match today to unlock funny words!</div>';
+        return;
+      }
+      container.innerHTML = words.map((w, i) => `
+        <div class="fw-card">
+          <div class="fw-rank-badge">${FW_RANK_LABEL[i] || '#'+(i+1)}</div>
+          <div class="fw-cat">${FW_FIELD_ICON[w.field]||'✨'} ${esc2(w.field || '')} · Letter ${esc2(w.letter || '')}</div>
+          <div class="fw-answer">${esc2(w.answer)}</div>
+          <div class="fw-reason">"${esc2(w.reason)}"</div>
+          ${w.player_name ? `<div class="fw-player">by ${esc2(w.player_name)}</div>` : ''}
+        </div>`).join('');
+    } catch(e) { /* silent fail */ }
+  }
+  loadFunnyWords();
+  setInterval(loadFunnyWords, 5 * 60 * 1000);
 
   // ── 3-D WIREFRAME BACKGROUND ──────────────────────────────
   const bgC = document.getElementById('bg-canvas');
