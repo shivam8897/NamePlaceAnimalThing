@@ -37,8 +37,7 @@ CREATE TABLE IF NOT EXISTS funny_words (
   word_date   DATE NOT NULL DEFAULT CURRENT_DATE
 );
 
--- Leaderboard view: ranks computed live from match history
--- all_ai_scored = false means at least one match is still pending AI patch
+-- Leaderboard view: only AI-validated scores count
 CREATE OR REPLACE VIEW leaderboard AS
 SELECT
   p.id,
@@ -47,10 +46,10 @@ SELECT
   COALESCE(SUM(mr.score), 0)::INTEGER   AS total_score,
   COUNT(mr.id)::INTEGER                  AS matches,
   COALESCE(MAX(mr.score), 0)::INTEGER   AS best_score,
-  RANK() OVER (ORDER BY COALESCE(SUM(mr.score), 0) DESC)::INTEGER AS rank,
-  BOOL_AND(COALESCE(mr.ai_scored, FALSE)) AS all_ai_scored
+  RANK() OVER (ORDER BY COALESCE(SUM(mr.score), 0) DESC)::INTEGER AS rank
 FROM players p
 INNER JOIN match_results mr ON mr.player_id = p.id
+WHERE mr.ai_scored = TRUE
 GROUP BY p.id, p.username, p.country
 ORDER BY total_score DESC
 LIMIT 100;

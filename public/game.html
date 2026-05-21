@@ -1141,8 +1141,8 @@
     <div class="winner-stamp"><span id="winner-name">—</span></div>
     <p class="winner-sub" id="winner-sub"></p>
     <div id="comp-score-badge" style="display:none;margin:10px 0">
-      <span style="background:var(--b);color:white;font-family:'Bangers',cursive;font-size:15px;letter-spacing:2px;padding:7px 18px;border-radius:4px;display:inline-block;box-shadow:0 3px 0 #0a1a9a">
-        🌐 SCORES SAVED TO GLOBAL LEADERBOARD
+      <span id="comp-score-badge-txt" style="background:#e88600;color:white;font-family:'Bangers',cursive;font-size:15px;letter-spacing:2px;padding:7px 18px;border-radius:4px;display:inline-block;box-shadow:0 3px 0 #7a4800">
+        ⏳ SCORE PENDING AI VALIDATION
       </span>
     </div>
     <div class="emoji-row">🎉 🎊 ⭐ 🌟 🎈</div>
@@ -1674,15 +1674,23 @@ function connect() {
     show('scoring'); renderScoring(d);
   });
   s.on('scores:patched', ({ scores }) => {
+    // Flip the in-round provisional notice
     const notice = document.getElementById('ai-pending-notice');
     if (notice && notice.style.display !== 'none') {
-      notice.innerHTML = '✅ Scores updated by AI validation';
+      notice.innerHTML = '✅ Scores confirmed by AI';
       notice.style.background = 'rgba(0,196,79,.12)';
       notice.style.borderColor = 'var(--g)';
       notice.style.color = '#007a30';
       setTimeout(() => { notice.style.display = 'none'; }, 4000);
     }
-    toast('📊 Scores have been AI-validated and updated on the leaderboard!');
+    // Flip the game-over badge to confirmed
+    const badge = document.getElementById('comp-score-badge-txt');
+    if (badge) {
+      badge.textContent = '🌐 SCORE ON GLOBAL LEADERBOARD';
+      badge.style.background = 'var(--b)';
+      badge.style.boxShadow = '0 3px 0 #0a1a9a';
+    }
+    toast('✅ AI validated your score — it\'s on the leaderboard!');
   });
   s.on('room:left', () => {
     S.code = null; S.isHost = false; S.isCompetitive = false;
