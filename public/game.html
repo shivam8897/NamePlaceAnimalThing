@@ -55,7 +55,7 @@
     clip-path:polygon(2% 0%,98% 0%,100% 15%,100% 85%,98% 100%,2% 100%,0% 85%,0% 15%);
     touch-action:manipulation;
   }
-  .btn-red:hover  { transform:translateY(-2px); box-shadow:0 7px 0 #8b0000; }
+  .btn-red:hover  { transform:translateY(-2px); box-shadow:0 7px 0 #8b0000; background:#ff2040; }
   .btn-red:active { transform:translateY(3px);  box-shadow:0 2px 0 #8b0000; }
   .btn-red:disabled { background:#aaa; box-shadow:0 3px 0 #666; cursor:not-allowed; transform:none; }
 
@@ -66,7 +66,7 @@
     clip-path:polygon(2% 0%,98% 0%,100% 15%,100% 85%,98% 100%,2% 100%,0% 85%,0% 15%);
     touch-action:manipulation;
   }
-  .btn-blue:hover  { transform:translateY(-2px); box-shadow:0 7px 0 #0a1a9a; }
+  .btn-blue:hover  { transform:translateY(-2px); box-shadow:0 7px 0 #0a1a9a; background:#3355ff; }
   .btn-blue:active { transform:translateY(3px);  box-shadow:0 2px 0 #0a1a9a; }
   .btn-blue:disabled { background:#aaa; box-shadow:0 3px 0 #666; cursor:not-allowed; transform:none; }
 
@@ -402,21 +402,44 @@
   }
 
   /* ── PROFILE ─────────────────────────────────────────── */
-  .profile-card { max-width:520px; width:100%; padding:28px 24px 40px; box-shadow:0 6px 28px rgba(0,0,0,.1); }
-  .profile-title { font-family:'Bangers',cursive; font-size:28px; letter-spacing:3px; color:var(--ink); text-align:center; margin-bottom:3px; }
-  .profile-sub { font-family:'Caveat',cursive; font-size:15px; color:#aaa; text-align:center; margin-bottom:18px; }
+  .profile-card { max-width:480px; width:100%; padding:28px 28px 36px; box-shadow:0 8px 32px rgba(0,0,0,.13); }
+  .profile-header { text-align:center; margin-bottom:18px; }
+  .profile-title { font-family:'Bangers',cursive; font-size:30px; letter-spacing:4px; color:var(--ink); margin-bottom:2px; }
+  .profile-sub { font-family:'Caveat',cursive; font-size:13px; color:#aaa; letter-spacing:2px; text-transform:uppercase; }
 
-  .av-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin:12px 0 20px; }
-  .av-card {
-    display:flex; flex-direction:column; align-items:center; gap:3px;
-    padding:10px 4px; border-radius:10px; cursor:pointer;
-    border:3px solid transparent; transition:transform .15s,border-color .15s,box-shadow .15s;
-    box-shadow:0 2px 6px rgba(0,0,0,.07); user-select:none;
+  /* Avatar carousel */
+  .av-carousel-wrap { display:flex; flex-direction:column; align-items:center; margin:4px 0 20px; }
+  .av-carousel { display:flex; align-items:center; justify-content:center; gap:16px; }
+  .av-showcase {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    width:130px; height:130px; border-radius:22px;
+    border:3px solid rgba(0,0,0,.08); box-shadow:0 6px 20px rgba(0,0,0,.13);
+    transition:background .25s, transform .18s; position:relative;
+    overflow:hidden;
   }
-  .av-card:hover { transform:translateY(-2px) scale(1.04); box-shadow:0 4px 12px rgba(0,0,0,.14); }
-  .av-card.sel { border-color:var(--b); box-shadow:0 0 0 2px var(--b),0 4px 14px rgba(26,58,255,.2); transform:scale(1.07); }
-  .av-emoji { font-size:30px; line-height:1.1; }
-  .av-name  { font-family:'Caveat',cursive; font-size:11px; font-weight:700; color:#888; }
+  .av-showcase:hover { transform:scale(1.03); }
+  .av-big-emoji { font-size:66px; line-height:1; margin-bottom:4px; }
+  .av-big-name { font-family:'Bangers',cursive; font-size:15px; letter-spacing:3px; color:rgba(0,0,0,.45); }
+  .av-arrow {
+    font-size:32px; line-height:1; background:white;
+    border:2.5px solid #ddd; border-radius:50%;
+    width:46px; height:46px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:transform .15s, background .15s, border-color .15s, color .15s;
+    color:var(--ink); box-shadow:0 2px 8px rgba(0,0,0,.1); padding:0; flex-shrink:0;
+    font-family:'Bangers',cursive;
+  }
+  .av-arrow:hover { background:var(--b); color:white; border-color:var(--b); transform:scale(1.12); }
+  .av-arrow:active { transform:scale(0.9); }
+  .av-dots { display:flex; justify-content:center; gap:7px; margin-top:12px; }
+  .av-dot {
+    width:9px; height:9px; border-radius:50%; background:#ddd;
+    transition:background .2s, transform .2s; border:none; padding:0; cursor:pointer;
+  }
+  .av-dot.sel { background:var(--b); transform:scale(1.4); }
+
+  .profile-fields { display:flex; flex-direction:column; gap:14px; }
+  .profile-field-group { margin:0; }
+  .lbl-opt { font-size:11px; opacity:0.5; font-weight:400; }
 
   /* ── MENU ────────────────────────────────────────────── */
   .menu-card { max-width:380px; width:100%; padding:24px 20px 32px; box-shadow:0 6px 28px rgba(0,0,0,.1); }
@@ -613,9 +636,9 @@
 
   /* ── RESPONSIVE ADDITIONS ───────────────────────────── */
   @media (max-width:520px) {
-    .av-grid { gap:6px; }
-    .av-card { padding:7px 2px; }
-    .av-emoji { font-size:24px; }
+    .av-showcase { width:110px; height:110px; }
+    .av-big-emoji { font-size:54px; }
+    .av-arrow { width:40px; height:40px; font-size:28px; }
     .menu-btn { font-size:16px; padding:11px 14px; }
     .browse-wrap { padding:0 2px; }
     .room-card { padding:12px 12px; gap:8px; }
@@ -682,13 +705,11 @@
 
   /* ── CURSOR ────────────────────────────────────────────── */
   *, *::before, *::after { cursor: none !important; }
-  #cursor-g { position:fixed; width:32px; height:32px; pointer-events:none; z-index:9999; transform:translate(-6px,-26px) rotate(-135deg); transition:transform 0.08s ease; }
-  #cursor-g.cursor--pointer { transform:translate(-2px,-2px); }
-  #cursor-g.cursor--pressed { transform:translate(-6px,-26px) rotate(-135deg) scale(0.85); }
-  #cursor-g.cursor--pointer.cursor--pressed { transform:translate(-2px,-2px) scale(0.85); }
-  .cursor-plane { display:none; }
-  #cursor-g.cursor--pointer .cursor-pencil { display:none; }
-  #cursor-g.cursor--pointer .cursor-plane  { display:block; }
+  #cursor-g { position:fixed; width:32px; height:32px; pointer-events:none; z-index:9999; transform:translate(-2px,-2px); transition:transform 0.08s ease; }
+  #cursor-g.cursor--pointer { transform:translate(-2px,-2px) scale(1.15); }
+  #cursor-g.cursor--pressed { transform:translate(-2px,-2px) scale(0.82); }
+  #cursor-g.cursor--pointer.cursor--pressed { transform:translate(-2px,-2px) scale(0.82); }
+  .cursor-pencil { display:none; }
   #trail-canvas-g { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9998; opacity:0.35; }
 
   /* ── COUNTRY DROPDOWN ─────────────────────────────────── */
@@ -722,28 +743,58 @@
 
   /* ── LEAVE BUTTON ─────────────────────────────────────── */
   .btn-leave {
-    position:fixed; top:14px; right:14px; z-index:100;
-    font-family:'Bangers',cursive; font-size:14px; letter-spacing:1px;
-    background:rgba(232,0,29,.9); color:white; border:none;
-    padding:7px 14px; cursor:pointer; border-radius:3px;
-    box-shadow:0 3px 0 #8b0000; display:none;
-    transition:transform .12s, box-shadow .12s;
+    position:fixed; top:16px; left:16px; z-index:100;
+    font-family:'Bangers',cursive; font-size:15px; letter-spacing:1px;
+    color:var(--ink); background:var(--y); border:2px solid rgba(0,0,0,.1);
+    padding:7px 14px 7px 10px; cursor:pointer; border-radius:4px;
+    box-shadow:2px 3px 0 rgba(0,0,0,.18); display:none;
+    transform:rotate(-1.5deg);
+    transition:transform .15s, box-shadow .15s;
   }
-  .btn-leave:hover  { transform:translateY(-1px); box-shadow:0 4px 0 #8b0000; }
-  .btn-leave:active { transform:translateY(2px);  box-shadow:0 1px 0 #8b0000; }
+  .btn-leave:hover  { transform:rotate(0deg) translateY(-1px); box-shadow:3px 4px 0 rgba(0,0,0,.24); }
+  .btn-leave:active { transform:translateY(1px); box-shadow:1px 2px 0 rgba(0,0,0,.18); }
   .btn-leave.visible { display:block; }
 
   /* ── COMPETITIVE LOBBY ────────────────────────────────── */
   .comp-wait-bar {
-    background:var(--ink); color:white; padding:12px 16px; text-align:center;
-    margin:14px 0; border-radius:4px;
+    background:var(--ink); color:white; padding:14px 16px; text-align:center;
+    margin:14px 0; border-radius:6px;
   }
-  .comp-wait-title { font-family:'Bangers',cursive; font-size:20px; letter-spacing:2px; color:#FFD700; }
-  .comp-wait-sub { font-family:'Caveat',cursive; font-size:14px; color:rgba(255,255,255,.75); margin-top:2px; }
-  .comp-starting-pill {
-    display:inline-block; background:var(--g); color:white;
-    font-family:'Bangers',cursive; font-size:22px; letter-spacing:3px;
-    padding:6px 20px; box-shadow:0 3px 0 #007a30; margin-top:8px;
+  .comp-wait-title { font-family:'Bangers',cursive; font-size:22px; letter-spacing:2px; color:#FFD700; }
+  .comp-wait-sub   { font-family:'Caveat',cursive; font-size:14px; color:rgba(255,255,255,.7); margin-top:3px; }
+  .comp-timer-ring {
+    position:relative; width:80px; height:80px; margin:10px auto 4px;
+  }
+  .comp-timer-ring svg { transform:rotate(-90deg); }
+  .comp-timer-arc {
+    stroke:#FFD700; stroke-width:5; fill:none;
+    stroke-dasharray:220; stroke-dashoffset:0;
+    stroke-linecap:round; transition:stroke-dashoffset 0.9s linear, stroke 0.3s;
+  }
+  .comp-timer-num {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:'Bangers',cursive; font-size:28px; color:#FFD700; letter-spacing:1px;
+  }
+  /* Dramatic 3-2-1 overlay */
+  #comp-dramatic {
+    position:fixed; inset:0; z-index:500; background:rgba(26,26,46,.97);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+  }
+  #comp-dramatic.show { display:flex; }
+  .comp-dramatic-num {
+    font-family:'Bangers',cursive; font-size:clamp(120px,30vw,220px);
+    color:var(--y); line-height:1;
+    text-shadow:0 0 60px rgba(255,230,0,.6), 0 0 120px rgba(255,230,0,.3);
+    animation:dramatic-pop .6s cubic-bezier(.36,.07,.19,.97);
+  }
+  @keyframes dramatic-pop {
+    0%   { transform:scale(2.2) rotate(-8deg); opacity:0; }
+    60%  { transform:scale(0.9) rotate(2deg);  opacity:1; }
+    100% { transform:scale(1)   rotate(0deg);  opacity:1; }
+  }
+  .comp-dramatic-label {
+    font-family:'Bangers',cursive; font-size:22px; letter-spacing:6px;
+    color:rgba(255,255,255,.7); margin-top:10px;
   }
 
   /* ── AI SCORING OVERLAY ───────────────────────────────── */
@@ -778,13 +829,7 @@
 <!-- CURSOR -->
 <canvas id="trail-canvas-g"></canvas>
 <div id="cursor-g">
-  <svg class="cursor-pencil" viewBox="0 0 32 32" fill="none">
-    <polygon points="13,8 19,8 16,2" fill="#2a2a2a"/>
-    <rect x="13" y="8" width="6" height="14" rx="1" fill="#FFE600" stroke="#333" stroke-width="1.5"/>
-    <rect x="13" y="22" width="6" height="5" rx="0.5" fill="#f4c878" stroke="#333" stroke-width="1.5"/>
-    <rect x="13" y="27" width="6" height="3" rx="1" fill="#bbb" stroke="#333" stroke-width="1"/>
-  </svg>
-  <svg class="cursor-plane" viewBox="0 0 32 32" fill="none">
+  <svg viewBox="0 0 32 32" fill="none">
     <path d="M2,2 L30,11 L17,17 Z" fill="#FFE600" stroke="#2a2a2a" stroke-width="1.3" stroke-linejoin="round"/>
     <path d="M2,2 L17,17 L10,28 Z" fill="#e8d000" stroke="#2a2a2a" stroke-width="1.3" stroke-linejoin="round"/>
     <line x1="2" y1="2" x2="17" y2="17" stroke="#2a2a2a" stroke-width="0.8" stroke-linecap="round" opacity="0.3"/>
@@ -797,32 +842,41 @@
 <div class="screen" id="screen-profile">
   <a href="index.html" class="back">← Home</a>
   <div class="torn profile-card">
-    <div class="logo-row">
-      <span class="logo-word lw-n">Name</span><span class="logo-sep">·</span>
-      <span class="logo-word lw-p">Place</span><span class="logo-sep">·</span>
-      <span class="logo-word lw-a">Animal</span><span class="logo-sep">·</span>
-      <span class="logo-word lw-t">Thing</span>
-    </div>
-    <div class="logo-sub">Real-time multiplayer</div>
-
-    <div style="margin-bottom:6px">
-      <label class="lbl">Your Name</label>
-      <input class="field" id="inp-name" type="text" placeholder="e.g. WordNinja" maxlength="20" autocomplete="off">
+    <div class="profile-header">
+      <div class="profile-title">YOUR PROFILE</div>
+      <div class="profile-sub">Choose your character &amp; set your name</div>
     </div>
 
-    <div style="margin-bottom:6px">
-      <label class="lbl">Country <span style="font-size:12px;opacity:0.5;font-weight:400">(optional — needed for Competitive)</span></label>
-      <div class="country-wrap">
-        <input class="field" id="inp-country" type="text" placeholder="Type to search country..." maxlength="40" autocomplete="off">
-        <div class="country-dd" id="country-dd"></div>
+    <!-- Avatar Carousel -->
+    <div class="av-carousel-wrap">
+      <div class="av-carousel">
+        <button class="av-arrow" id="av-prev" onclick="prevAv()">‹</button>
+        <div class="av-showcase" id="av-showcase">
+          <div class="av-big-emoji" id="av-big-emoji">🦁</div>
+          <div class="av-big-name" id="av-big-name">Leo</div>
+        </div>
+        <button class="av-arrow" id="av-next" onclick="nextAv()">›</button>
       </div>
-      <p class="err" id="country-err" style="font-size:12px;min-height:0"></p>
+      <div class="av-dots" id="av-dots"></div>
     </div>
 
-    <label class="lbl" style="margin-top:14px">Choose Your Character</label>
-    <div class="av-grid" id="av-grid"></div>
+    <div class="profile-fields">
+      <div class="profile-field-group">
+        <label class="lbl">Display Name</label>
+        <input class="field" id="inp-name" type="text" placeholder="e.g. WordNinja" maxlength="20" autocomplete="off">
+      </div>
 
-    <button class="btn-blue" style="width:100%;font-size:20px" onclick="continueToMenu()">CONTINUE →</button>
+      <div class="profile-field-group">
+        <label class="lbl">Country <span class="lbl-opt">(optional — needed for Competitive)</span></label>
+        <div class="country-wrap">
+          <input class="field" id="inp-country" type="text" placeholder="Type to search country..." maxlength="40" autocomplete="off">
+          <div class="country-dd" id="country-dd"></div>
+        </div>
+        <p class="err" id="country-err" style="font-size:12px;min-height:0"></p>
+      </div>
+    </div>
+
+    <button class="btn-red" style="width:100%;font-size:20px;margin-top:20px" onclick="continueToMenu()">LET'S PLAY →</button>
     <p class="err" id="profile-err"></p>
   </div>
 </div>
@@ -851,7 +905,6 @@
       <span class="mb-ico">🔑</span> JOIN WITH CODE
     </button>
     <p class="err" id="join-err"></p>
-    <button id="btn-logout" onclick="doLogout()" style="display:none;background:none;border:none;font-family:'Caveat',cursive;font-size:14px;color:#aaa;cursor:pointer;margin-top:10px;text-decoration:underline;">Log out</button>
   </div>
 </div>
 
@@ -950,8 +1003,8 @@
 
 <!-- ── BROWSE ──────────────────────────────────────────────── -->
 <div class="screen" id="screen-browse">
+  <a href="#" class="back" onclick="stopBrowse();show('menu');return false">← Back</a>
   <div class="browse-wrap">
-    <a href="#" class="back" style="position:static;display:inline-flex;margin-bottom:12px" onclick="stopBrowse();show('menu');return false">← Back</a>
     <div class="browse-head">
       <div class="browse-title">OPEN ROOMS</div>
       <button class="btn-refresh" onclick="loadRooms()">↻ Refresh</button>
@@ -1003,9 +1056,15 @@
 
     <!-- Competitive: wait / countdown display -->
     <div id="comp-wait-bar" style="display:none" class="comp-wait-bar">
-      <div class="comp-wait-title" id="comp-wait-title">WAITING FOR PLAYERS</div>
-      <div class="comp-wait-sub" id="comp-wait-sub">Match starts when 8 players join</div>
-      <div id="comp-starting-pill" style="display:none" class="comp-starting-pill">STARTING IN <span id="comp-cd">10</span>s</div>
+      <div class="comp-wait-title" id="comp-wait-title">🏆 COMPETITIVE</div>
+      <div class="comp-wait-sub" id="comp-wait-sub">Need 2+ players to start</div>
+      <div class="comp-timer-ring" id="comp-timer-ring" style="display:none">
+        <svg viewBox="0 0 80 80" width="80" height="80">
+          <circle cx="40" cy="40" r="35" stroke="rgba(255,255,255,.12)" stroke-width="5" fill="none"/>
+          <circle class="comp-timer-arc" id="comp-timer-arc" cx="40" cy="40" r="35"/>
+        </svg>
+        <div class="comp-timer-num" id="comp-timer-num">60</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1217,7 +1276,7 @@
 </div>
 
 <!-- Floating leave button (shown during active game) -->
-<button class="btn-leave" id="btn-leave" onclick="promptLeave()">✕ LEAVE</button>
+<button class="btn-leave" id="btn-leave" onclick="promptLeave()">← LEAVE</button>
 
 <div id="toast"></div>
 
@@ -1292,15 +1351,22 @@ async function initSupabase() {
   } catch(e) { show('profile'); }
 }
 
+function _showLogoutBtns() {
+  const el = document.getElementById('btn-logout'); if (el) el.style.display = 'block';
+}
 async function loadAndPrefillProfile() {
   if (!_supabase || !_authSession) { show('profile'); return; }
+  _showLogoutBtns();
   try {
     const { data: player } = await _supabase
       .from('players')
       .select('username, country')
-      .eq('id', _authSession.user.id)
-      .single();
+      .eq('id', _authSession?.user?.id)
+      .maybeSingle();
     if (player?.username) {
+      // Existing user — restore state and go straight to menu
+      S.myName    = player.username;
+      S.myCountry = player.country || '';
       document.getElementById('inp-name').value = player.username;
       if (player.country) {
         const inp = document.getElementById('inp-country');
@@ -1308,12 +1374,17 @@ async function loadAndPrefillProfile() {
         _countryValid = true;
         inp.classList.add('country-valid');
       }
+      const ch = CHARS.find(c => c.emoji === S.myAvatar) || CHARS[0];
+      const big = document.getElementById('menu-av-big');
+      if (big) { big.textContent = S.myAvatar; big.style.background = ch.bg; }
+      const mn = document.getElementById('menu-name');
+      if (mn) mn.textContent = S.myName;
+      show('menu');
+    } else {
+      // New user — no profile yet, let them set it up
+      show('profile');
     }
-  } catch(e) { /* new user or no profile yet */ }
-  // Show logout button on menu
-  const btnLogout = document.getElementById('btn-logout');
-  if (btnLogout) btnLogout.style.display = 'block';
-  show('profile');
+  } catch(e) { show('profile'); }
 }
 
 // ── Player identity (persists across sessions via localStorage) ──
@@ -1372,42 +1443,55 @@ function toast(msg, ms=2800) {
 }
 
 // ── Profile screen ────────────────────────────────────────────
-function buildAvatarGrid() {
-  document.getElementById('av-grid').innerHTML = CHARS.map((c,i) => `
-    <div class="av-card${i===0?' sel':''}" data-i="${i}" onclick="selAv(${i})" style="background:${c.bg}">
-      <span class="av-emoji">${c.emoji}</span>
-      <span class="av-name">${c.name}</span>
-    </div>
-  `).join('');
-  S.myAvatar = CHARS[0].emoji;
+let _avIdx = 0;
+function buildAvatarCarousel() {
+  _avIdx = 0;
+  const dotsEl = document.getElementById('av-dots');
+  dotsEl.innerHTML = CHARS.map((_,i) =>
+    `<button class="av-dot${i===0?' sel':''}" onclick="selAv(${i})"></button>`
+  ).join('');
+  renderAvCarousel();
 }
-function selAv(i) {
-  document.querySelectorAll('.av-card').forEach(c => c.classList.remove('sel'));
-  document.querySelector(`.av-card[data-i="${i}"]`).classList.add('sel');
-  S.myAvatar = CHARS[i].emoji;
+function renderAvCarousel() {
+  document.getElementById('av-big-emoji').textContent = CHARS[_avIdx].emoji;
+  document.getElementById('av-big-name').textContent  = CHARS[_avIdx].name;
+  document.getElementById('av-showcase').style.background = CHARS[_avIdx].bg;
+  document.querySelectorAll('.av-dot').forEach((d,i) => d.classList.toggle('sel', i===_avIdx));
+  S.myAvatar = CHARS[_avIdx].emoji;
 }
+function selAv(i) { _avIdx = i; renderAvCarousel(); }
+function prevAv()  { _avIdx = (_avIdx - 1 + CHARS.length) % CHARS.length; renderAvCarousel(); }
+function nextAv()  { _avIdx = (_avIdx + 1) % CHARS.length; renderAvCarousel(); }
 function continueToMenu() {
-  const n = document.getElementById('inp-name').value.trim();
-  if (!n) { document.getElementById('profile-err').textContent = 'Enter your name first!'; return; }
-  const countryVal = document.getElementById('inp-country').value.trim();
-  if (countryVal && !_countryValid) {
-    document.getElementById('profile-err').textContent = 'Please select a valid country from the dropdown (or leave it blank)';
-    return;
+  try {
+    const n = document.getElementById('inp-name').value.trim();
+    if (!n) { document.getElementById('profile-err').textContent = 'Enter your name first!'; return; }
+    const countryVal = document.getElementById('inp-country').value.trim();
+    if (countryVal && !_countryValid) {
+      document.getElementById('profile-err').textContent = 'Please select a valid country from the dropdown (or leave blank)';
+      return;
+    }
+    S.myName = n;
+    S.myCountry = countryVal;
+    document.getElementById('profile-err').textContent = '';
+    const ch = CHARS.find(c => c.emoji === S.myAvatar) || CHARS[0];
+    const big = document.getElementById('menu-av-big');
+    if (big) { big.textContent = S.myAvatar; big.style.background = ch.bg; }
+    const mn = document.getElementById('menu-name');
+    if (mn) mn.textContent = n;
+    // Persist to Supabase (fire-and-forget, never block navigation)
+    try {
+      if (_supabase && _authSession?.user?.id) {
+        _supabase.from('players')
+          .upsert({ id: _authSession.user.id, username: n, country: countryVal || '' }, { onConflict: 'id' })
+          .then(() => {}, () => {});
+      }
+    } catch(_) {}
+    show('menu');
+  } catch(e) {
+    console.error('continueToMenu error:', e);
+    show('menu'); // navigate anyway
   }
-  S.myName = n;
-  S.myCountry = countryVal;
-  document.getElementById('profile-err').textContent = '';
-  const ch = CHARS.find(c => c.emoji === S.myAvatar) || CHARS[0];
-  const big = document.getElementById('menu-av-big');
-  big.textContent = S.myAvatar; big.style.background = ch.bg;
-  document.getElementById('menu-name').textContent = n;
-  // Persist profile to Supabase (fire-and-forget)
-  if (_supabase && _authSession) {
-    _supabase.from('players')
-      .upsert({ id: _authSession.user.id, username: n, country: countryVal || '' }, { onConflict: 'id' })
-      .catch(() => {});
-  }
-  show('menu');
 }
 document.getElementById('inp-name').addEventListener('keydown', e => { if(e.key==='Enter') continueToMenu(); });
 
@@ -1480,8 +1564,6 @@ async function doLogin() {
   if (error) { document.getElementById('auth-err').textContent = error.message; return; }
   _authSession = data.session;
   document.getElementById('auth-err').textContent = '';
-  const btnLogout = document.getElementById('btn-logout');
-  if (btnLogout) btnLogout.style.display = 'block';
   toast('✅ Signed in!');
   await loadAndPrefillProfile();
 }
@@ -1499,10 +1581,9 @@ async function doSignup() {
   if (error) { document.getElementById('auth-err').textContent = error.message; return; }
   _authSession = data.session;
   document.getElementById('auth-err').textContent = '';
-  const btnLogout = document.getElementById('btn-logout');
-  if (btnLogout) btnLogout.style.display = 'block';
+  _showLogoutBtns();
   toast('✅ Account created! Set up your profile.');
-  show('profile'); // new user — profile is blank, let them fill it
+  show('profile'); // new user — always go to profile first
 }
 
 async function doLogout() {
@@ -1513,8 +1594,7 @@ async function doLogout() {
   document.getElementById('inp-country').value = '';
   _countryValid = false;
   document.getElementById('inp-country').classList.remove('country-valid');
-  const btnLogout = document.getElementById('btn-logout');
-  if (btnLogout) btnLogout.style.display = 'none';
+  const _lb = document.getElementById('btn-logout'); if (_lb) _lb.style.display = 'none';
   show('auth');
 }
 
@@ -1653,13 +1733,28 @@ function connect() {
   s.on('rooms:updated', () => {
     if(document.getElementById('screen-browse').classList.contains('active')) loadRooms();
   });
-  s.on('game:countdown', ({count}) => {
-    show('countdown');
-    const el = document.getElementById('cd-el');
-    el.textContent = count===0?'GO!':count;
-    el.className = 'cd'+(count===0?' go':'');
-    el.style.animation='none'; el.offsetHeight;
-    el.style.animation='cd-pop .8s cubic-bezier(.36,.07,.19,.97)';
+  s.on('game:countdown', ({count, dramatic}) => {
+    if (dramatic) {
+      // Fullscreen dramatic overlay for competitive last-3-seconds
+      const ov  = document.getElementById('comp-dramatic');
+      const num = document.getElementById('comp-dramatic-num');
+      if (ov && num) {
+        ov.classList.add('show');
+        num.textContent = count === 0 ? 'GO!' : count;
+        // Re-trigger animation
+        num.style.animation = 'none'; num.offsetHeight;
+        num.style.animation = 'dramatic-pop .6s cubic-bezier(.36,.07,.19,.97)';
+        if (count === 0) setTimeout(() => ov.classList.remove('show'), 700);
+      }
+    } else {
+      document.getElementById('comp-dramatic')?.classList.remove('show');
+      show('countdown');
+      const el = document.getElementById('cd-el');
+      el.textContent = count===0?'GO!':count;
+      el.className = 'cd'+(count===0?' go':'');
+      el.style.animation='none'; el.offsetHeight;
+      el.style.animation='cd-pop .8s cubic-bezier(.36,.07,.19,.97)';
+    }
   });
   s.on('round:start', d => {
     hideAIOverlay();
@@ -1695,21 +1790,34 @@ function connect() {
   });
   s.on('room:restarted', d => { S.isHost=d.host===s.id; show('lobby'); renderLobby(d); stopConfetti(); });
 
-  // Competitive events
-  s.on('competitive:countdown', ({ count }) => {
-    const pill = document.getElementById('comp-starting-pill');
-    const cd   = document.getElementById('comp-cd');
-    if (pill) { pill.style.display = 'inline-block'; }
-    if (cd)   { cd.textContent = count; }
-    const sub = document.getElementById('comp-wait-sub');
-    if (sub) sub.textContent = 'Game starting in...';
+  // Competitive lobby timer
+  s.on('competitive:timer', ({ seconds, players, maxPlayers, minPlayers }) => {
+    const ring  = document.getElementById('comp-timer-ring');
+    const arc   = document.getElementById('comp-timer-arc');
+    const num   = document.getElementById('comp-timer-num');
+    const title = document.getElementById('comp-wait-title');
+    const sub   = document.getElementById('comp-wait-sub');
+    if (ring) ring.style.display = 'block';
+    if (num)  num.textContent = seconds;
+    if (title) title.textContent = `${players}/${maxPlayers} PLAYERS`;
+    if (sub)   sub.textContent = players >= maxPlayers ? 'Starting now!' : `Match starts in ${seconds}s or when ${maxPlayers} join`;
+    // Animate arc: dashoffset 0=full, 220=empty
+    if (arc) {
+      const pct = seconds / 60;
+      arc.style.strokeDashoffset = (220 * (1 - pct)).toFixed(1);
+      arc.style.stroke = seconds <= 10 ? '#ff4444' : seconds <= 20 ? '#FF6B00' : '#FFD700';
+    }
   });
-  s.on('competitive:wait', () => {
-    const pill = document.getElementById('comp-starting-pill');
-    if (pill) pill.style.display = 'none';
-    const sub = document.getElementById('comp-wait-sub');
-    if (sub) sub.textContent = 'A player left — waiting for 8 players again';
-    toast('⚠ A player left — waiting for full lobby...');
+  s.on('competitive:wait', ({ players, minPlayers }) => {
+    const ring  = document.getElementById('comp-timer-ring');
+    const title = document.getElementById('comp-wait-title');
+    const sub   = document.getElementById('comp-wait-sub');
+    const arc   = document.getElementById('comp-timer-arc');
+    if (ring)  ring.style.display = 'none';
+    if (arc)   { arc.style.strokeDashoffset = '0'; arc.style.stroke = '#FFD700'; }
+    if (title) title.textContent = `${players}/${minPlayers}+ PLAYERS`;
+    if (sub)   sub.textContent = `Need ${minPlayers}+ players to start the timer`;
+    toast('⚠ A player left — timer paused');
   });
   s.on('ai:scoring', () => {
     // AI scoring is now batched in background — no blocking overlay
@@ -1765,7 +1873,7 @@ function showAIOverlay() { document.getElementById('ai-overlay').classList.add('
 function hideAIOverlay() { document.getElementById('ai-overlay').classList.remove('show'); }
 
 connect();
-buildAvatarGrid();
+buildAvatarCarousel();
 initSupabase();
 
 // ── Lobby ─────────────────────────────────────────────────────
@@ -1809,9 +1917,11 @@ function renderLobby(d) {
     document.getElementById('comp-wait-title').textContent =
       `${d.players.length}/${d.maxPlayers} PLAYERS`;
     document.getElementById('comp-wait-sub').textContent =
-      d.players.length < d.maxPlayers
-        ? `Match starts automatically when 8 players join`
-        : `Match starting soon...`;
+      d.players.length < 2
+        ? `Need 2+ players to start the timer`
+        : d.players.length >= d.maxPlayers
+          ? `Starting now!`
+          : `Match starts in 60s or when ${d.maxPlayers} join`;
   } else {
     compBar.style.display = 'none';
     if (codeBox) codeBox.style.visibility = '';
@@ -2028,7 +2138,7 @@ function buildScoreTable(scores) {
   }).join('');
 }
 
-function renderScoring({scores,leaderboard,round,maxRounds,isLastRound,aiScored}) {
+function renderScoring({scores,leaderboard,round,maxRounds,isLastRound,aiScored,compBonus}) {
   _currentScores = scores;
   document.getElementById('sc-meta').textContent=`Letter ${S.letter} — Round ${round}/${maxRounds}`;
   document.getElementById('sc-tbody').innerHTML=buildScoreTable(scores);
@@ -2037,6 +2147,11 @@ function renderScoring({scores,leaderboard,round,maxRounds,isLastRound,aiScored}
   // Show provisional notice for competitive matches
   const notice = document.getElementById('ai-pending-notice');
   if (notice) notice.style.display = (S.isCompetitive && aiScored === false) ? 'block' : 'none';
+  // Show competition bonus toast on last round
+  if (isLastRound && compBonus > 0) {
+    const n = leaderboard.length;
+    toast(`🏆 +${compBonus} competition bonus (${n}-player match)!`, 4000);
+  }
 }
 
 
@@ -2214,7 +2329,7 @@ function bindPress(el) {
   el.addEventListener('touchstart', () => applyPress(el),   { passive: true });
   el.addEventListener('touchend',   () => releasePress(el), { passive: true });
 }
-const PRESS_SEL = '.btn-red,.btn-blue,.btn-out,.btn-sub,.btn-done-sc,.btn-refresh,.btn-qj,.btn-join-g,.btn-join-b,.back,.code-box,.field,.av-card';
+const PRESS_SEL = '.btn-red,.btn-blue,.btn-out,.btn-sub,.btn-done-sc,.btn-refresh,.btn-qj,.btn-join-g,.btn-join-b,.back,.code-box,.field,.av-arrow,.av-dot';
 document.querySelectorAll(PRESS_SEL).forEach(bindPress);
 new MutationObserver(() => document.querySelectorAll(PRESS_SEL).forEach(bindPress))
   .observe(document.body, { childList: true, subtree: true });
@@ -2246,8 +2361,9 @@ new MutationObserver(() => document.querySelectorAll(PRESS_SEL).forEach(bindPres
     ctx.clearRect(0, 0, cnv.width, cnv.height);
     for (let i = 1; i < trail.length; i++) {
       const p = trail[i], pp = trail[i-1]; p.age++;
-      const a = Math.max(0, 1 - p.age/60);
-      const w = Math.max(0.5, (1 - p.age/60) * (p.pressed ? 7 : 2.5));
+      const fade = Math.max(0, 1 - p.age/60);
+      const a = Math.min(1, fade * (p.pressed ? 2.2 : 1));
+      const w = Math.max(0.5, fade * (p.pressed ? 9 : 2.5));
       ctx.beginPath(); ctx.moveTo(pp.x, pp.y); ctx.lineTo(p.x, p.y);
       ctx.strokeStyle = p.color.replace('hsl','hsla').replace(')', `,${a})`);
       ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
@@ -2256,5 +2372,14 @@ new MutationObserver(() => document.querySelectorAll(PRESS_SEL).forEach(bindPres
   })();
 })();
 </script>
+
+<!-- Dramatic competitive countdown overlay -->
+<div id="comp-dramatic">
+  <div class="comp-dramatic-num" id="comp-dramatic-num">3</div>
+  <div class="comp-dramatic-label">GET READY!</div>
+</div>
+
+<!-- Global logout button — fixed top-right, visible on all screens when logged in -->
+<button id="btn-logout" onclick="doLogout()" style="display:none;position:fixed;top:16px;right:16px;font-family:'Bangers',cursive;font-size:15px;letter-spacing:1px;color:white;background:var(--r);padding:7px 14px;border-radius:4px;border:2px solid rgba(0,0,0,.15);box-shadow:2px 3px 0 #8b0000;transform:rotate(1.5deg);cursor:pointer;transition:transform .15s,box-shadow .15s;z-index:200;">Log out ✕</button>
 </body>
 </html>

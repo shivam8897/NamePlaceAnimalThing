@@ -37,10 +37,12 @@ const TIMER_OPTIONS      = [10, 20, 30, 60];
 const ROUND_OPTIONS      = [3, 5, 10];
 
 const COMP_ROUNDS      = 5;
-const COMP_PLAYERS     = 8;
-const COMP_START_DELAY = 10;
+const COMP_MIN_PLAYERS = 2;    // minimum to start the lobby timer
+const COMP_PLAYERS     = 8;    // maximum / instant-start
+const COMP_WAIT_TIME   = 60;   // seconds after 2+ players join before auto-start
 const COMP_AUTO_ADV    = 20;
 const COMP_DAILY_LIMIT = 5;    // competitive matches per player per day
+const COMP_BONUS       = { 2:5, 3:10, 4:15, 5:20, 6:30, 7:40, 8:50 };
 const MAX_DAILY_API_CALLS = 50; // hard cap on AI API calls per day
 const BATCH_SIZE       = 5;    // max matches processed per batch call
 const BATCH_INTERVAL   = 5 * 60 * 1000; // 5 minutes
@@ -469,10 +471,17 @@ function finalizeRoundCompetitive(room) {
   const lb      = leaderboard(room);
   const isLast  = room.round >= room.maxRounds;
 
+  // Apply competition bonus to final leaderboard
+  const compBonus = (isLast && room.compBonus) ? room.compBonus : 0;
+  if (compBonus) {
+    lb.forEach(e => { e.score += compBonus; });
+    room.players.forEach(p => { p.score += compBonus; });
+  }
+
   // aiScored:false tells the client scores are provisional
   io.to(room.code).emit('round:end', {
     scores, leaderboard: lb, round: room.round, maxRounds: room.maxRounds,
-    isLastRound: isLast, aiScored: false,
+    isLastRound: isLast, aiScored: false, compBonus,
   });
 
   if (isLast) {
@@ -518,29 +527,67 @@ function finalizeEvaluation(room) {
   }, 1000);
 }
 
-// ─── Competitive auto-start ───────────────────────────────────
-function startCompetitiveCountdown(room) {
-  if (room.compStartTimer || room.state !== 'waiting') return;
-  room.compStartCount = COMP_START_DELAY;
-  io.to(room.code).emit('competitive:countdown', { count: room.compStartCount });
-  room.compStartTimer = setInterval(() => {
-    room.compStartCount--;
-    if (room.compStartCount <= 0) {
-      clearInterval(room.compStartTimer);
-      room.compStartTimer = null;
-      if (room.state !== 'waiting') return;
-      room.state = 'countdown';
-      let count = 3;
-      io.to(room.code).emit('game:countdown', { count });
-      const cd = setInterval(() => {
-        count--;
-        if (count <= 0) { clearInterval(cd); startRound(room); }
-        else io.to(room.code).emit('game:countdown', { count });
+// ─── Competitive lobby timer ──────────────────────────────────
+function emitCompTimer(room) {
+  io.to(room.code).emit('competitive:timer', {
+    seconds:    room.compStartCount,
+    players:    room.players.size,
+    maxPlayers: COMP_PLAYERS,
+    minPlayers: COMP_MIN_PLAYERS,
+  });
+}
+
+function launchComp(room) {
+  if (room.state !== 'waiting') return;
+  if (room.players.size < COMP_MIN_PLAYERS) return;
+  room.compBonus = COMP_BONUS[room.players.size] || COMP_BONUS[COMP_MIN_PLAYERS];
+  room.state = 'countdown';
+  let count = 3;
+  io.to(room.code).emit('game:countdown', { count, dramatic: true });
+  const cd = setInterval(() => {
+    count--;
+    if (count <= 0) { clearInterval(cd); startRound(room); }
+    else io.to(room.code).emit('game:countdown', { count, dramatic: true });
+  }, 1000);
+}
+
+function tickCompLobby(room) {
+  if (room.state !== 'waiting') return;
+  const n = room.players.size;
+
+  if (n >= COMP_PLAYERS) {
+    // Full house — start immediately
+    if (room.compStartTimer) { clearInterval(room.compStartTimer); room.compStartTimer = null; }
+    launchComp(room);
+    return;
+  }
+
+  if (n >= COMP_MIN_PLAYERS) {
+    if (!room.compStartTimer) {
+      room.compStartCount = COMP_WAIT_TIME;
+      emitCompTimer(room);
+      room.compStartTimer = setInterval(() => {
+        room.compStartCount--;
+        emitCompTimer(room);
+        if (room.compStartCount <= 0) {
+          clearInterval(room.compStartTimer);
+          room.compStartTimer = null;
+          launchComp(room);
+        }
       }, 1000);
     } else {
-      io.to(room.code).emit('competitive:countdown', { count: room.compStartCount });
+      // Timer already running — just update player count
+      emitCompTimer(room);
     }
-  }, 1000);
+  } else {
+    // Dropped below minimum — pause/reset timer
+    if (room.compStartTimer) {
+      clearInterval(room.compStartTimer);
+      room.compStartTimer = null;
+      room.compStartCount = COMP_WAIT_TIME;
+    }
+    io.to(room.code).emit('competitive:wait', { players: n, minPlayers: COMP_MIN_PLAYERS });
+  }
 }
 
 // ─── Supabase: save scores ────────────────────────────────────
@@ -831,11 +878,9 @@ async function handlePlayerLeave(socket, room, code) {
     return;
   }
 
-  // Cancel competitive countdown if we drop below required players
-  if (room.isCompetitive && room.compStartTimer && room.players.size < COMP_PLAYERS) {
-    clearInterval(room.compStartTimer);
-    room.compStartTimer = null;
-    io.to(code).emit('competitive:wait');
+  // Re-evaluate competitive lobby timer after player leaves
+  if (room.isCompetitive && room.state === 'waiting') {
+    tickCompLobby(room);
   }
 
   if (room.host === socket.id) {
@@ -946,14 +991,16 @@ io.on('connection', (socket) => {
       timer: 30, isCompetitive: true,
     };
 
+    // Find the open waiting competitive lobby (most filled first)
     const best = Array.from(rooms.values())
       .filter(r => r.isCompetitive && r.state === 'waiting' && r.players.size < COMP_PLAYERS)
-      .sort((a, b) => (b.players.size / b.maxPlayers) - (a.players.size / a.maxPlayers))[0] || null;
+      .sort((a, b) => b.players.size - a.players.size)[0] || null;
 
     if (!best) {
       const room = makeRoom(socket.id, name, avatar || '🦁', { ...COMP_OPTS, country, playerId: userId });
       socket.join(room.code);
       socket.emit('room:joined', { isHost: false, isCompetitive: true, ...publicRoom(room) });
+      tickCompLobby(room);
       return;
     }
 
@@ -964,8 +1011,7 @@ io.on('connection', (socket) => {
     socket.join(best.code);
     socket.emit('room:joined', { isHost: false, isCompetitive: true, ...publicRoom(best) });
     socket.to(best.code).emit('room:update', publicRoom(best));
-
-    if (best.players.size >= COMP_PLAYERS) startCompetitiveCountdown(best);
+    tickCompLobby(best);
   });
 
   socket.on('room:leave', async ({ code }) => {

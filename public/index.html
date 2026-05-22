@@ -38,13 +38,11 @@
   body { background-color: var(--paper); font-family: 'Comic Neue', 'Comic Sans MS', cursive; overflow-x: hidden; cursor: none; }
 
   /* tip at (16,2); after rotate(-135deg) it lands at (6.1,25.9) → translate(-6,-26) aligns tip to mouse */
-  #cursor { position: fixed; width: 32px; height: 32px; pointer-events: none; z-index: 9999; transform: translate(-6px, -26px) rotate(-135deg); transition: transform 0.08s ease; }
-  #cursor.cursor--pointer { transform: translate(-2px, -2px); }
-  #cursor.cursor--pressed { transform: translate(-6px, -26px) rotate(-135deg) scale(0.85); }
-  #cursor.cursor--pointer.cursor--pressed { transform: translate(-2px, -2px) scale(0.85); }
-  .cursor-plane { display: none; }
-  #cursor.cursor--pointer .cursor-pencil { display: none; }
-  #cursor.cursor--pointer .cursor-plane { display: block; }
+  #cursor { position: fixed; width: 32px; height: 32px; pointer-events: none; z-index: 9999; transform: translate(-2px, -2px); transition: transform 0.08s ease; }
+  #cursor.cursor--pointer { transform: translate(-2px, -2px) scale(1.15); }
+  #cursor.cursor--pressed { transform: translate(-2px, -2px) scale(0.82); }
+  #cursor.cursor--pointer.cursor--pressed { transform: translate(-2px, -2px) scale(0.82); }
+  .cursor-pencil { display: none; }
   #trail-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9998; opacity: 0.35; }
 
   .notebook-bg {
@@ -422,22 +420,10 @@
 
 <canvas id="trail-canvas"></canvas>
 <div id="cursor">
-  <!-- pencil: tip at top (16,2), eraser cap at bottom — rotated -135deg so tip points upper-left -->
-  <svg class="cursor-pencil" viewBox="0 0 32 32" fill="none">
-    <polygon points="13,8 19,8 16,2" fill="#2a2a2a"/>
-    <rect x="13" y="8" width="6" height="14" rx="1" fill="#FFE600" stroke="#333" stroke-width="1.5"/>
-    <rect x="13" y="22" width="6" height="5" rx="0.5" fill="#f4c878" stroke="#333" stroke-width="1.5"/>
-    <rect x="13" y="27" width="6" height="3" rx="1" fill="#bbb" stroke="#333" stroke-width="1"/>
-  </svg>
-  <!-- paper plane: nose at (2,2) pointing upper-left — shown when hovering interactive elements -->
-  <svg class="cursor-plane" viewBox="0 0 32 32" fill="none">
-    <!-- upper wing: nose at (2,2) -->
+  <svg viewBox="0 0 32 32" fill="none">
     <path d="M2,2 L30,11 L17,17 Z" fill="#FFE600" stroke="#2a2a2a" stroke-width="1.3" stroke-linejoin="round"/>
-    <!-- lower flap -->
     <path d="M2,2 L17,17 L10,28 Z" fill="#e8d000" stroke="#2a2a2a" stroke-width="1.3" stroke-linejoin="round"/>
-    <!-- fold crease -->
     <line x1="2" y1="2" x2="17" y2="17" stroke="#2a2a2a" stroke-width="0.8" stroke-linecap="round" opacity="0.3"/>
-    <!-- motion dots behind the tail -->
     <circle cx="25" cy="7" r="1.3" fill="#2a2a2a" opacity="0.18"/>
     <circle cx="29" cy="5" r="0.8" fill="#2a2a2a" opacity="0.12"/>
   </svg>
@@ -639,9 +625,9 @@
     ctx.clearRect(0,0,canvas.width,canvas.height);
     for (let i=1;i<trail.length;i++) {
       const p=trail[i], pp=trail[i-1]; p.age++;
-      const a=Math.max(0,1-p.age/60);
-      const maxW = p.pressed ? 7 : 2.5;
-      const w=Math.max(0.5,(1-p.age/60)*maxW);
+      const fade=Math.max(0,1-p.age/60);
+      const a=Math.min(1, fade*(p.pressed?2.2:1));
+      const w=Math.max(0.5,fade*(p.pressed?9:2.5));
       ctx.beginPath(); ctx.moveTo(pp.x,pp.y); ctx.lineTo(p.x,p.y);
       ctx.strokeStyle=p.color.replace('hsl','hsla').replace(')',`,${a})`);
       ctx.lineWidth=w; ctx.lineCap='round'; ctx.stroke();
