@@ -546,8 +546,13 @@ function launchComp(room) {
   io.to(room.code).emit('game:countdown', { count, dramatic: true });
   const cd = setInterval(() => {
     count--;
-    if (count <= 0) { clearInterval(cd); startRound(room); }
-    else io.to(room.code).emit('game:countdown', { count, dramatic: true });
+    if (count <= 0) {
+      clearInterval(cd);
+      io.to(room.code).emit('game:countdown', { count: 0, dramatic: true });
+      setTimeout(() => startRound(room), 700);
+    } else {
+      io.to(room.code).emit('game:countdown', { count, dramatic: true });
+    }
   }, 1000);
 }
 
@@ -1041,8 +1046,13 @@ io.on('connection', (socket) => {
     io.to(code).emit('game:countdown', { count });
     const cd = setInterval(() => {
       count--;
-      if (count <= 0) { clearInterval(cd); startRound(room); }
-      else io.to(code).emit('game:countdown', { count });
+      if (count <= 0) {
+        clearInterval(cd);
+        io.to(code).emit('game:countdown', { count: 0 });
+        setTimeout(() => startRound(room), 700);
+      } else {
+        io.to(code).emit('game:countdown', { count });
+      }
     }, 1000);
   });
 
