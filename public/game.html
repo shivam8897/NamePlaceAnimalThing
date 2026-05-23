@@ -1152,10 +1152,6 @@
     <h2 class="sc-title">ROUND RESULTS</h2>
     <p class="sc-meta" id="sc-meta">Letter N — Round 1/5</p>
 
-    <!-- AI pending notice (shown for competitive provisional scores) -->
-    <div id="ai-pending-notice" style="display:none;text-align:center;font-family:'Caveat',cursive;font-size:14px;color:#e88600;background:rgba(255,140,0,.1);border:1px solid rgba(255,140,0,.3);padding:6px 14px;border-radius:4px;margin-bottom:10px">
-      ⏳ Provisional scores — AI validation in progress (updates within 5 min)
-    </div>
 
     <!-- Challenge result banner -->
     <div class="ch-banner" id="ch-banner">
@@ -1199,11 +1195,6 @@
     <h1 class="go-title">GAME OVER!</h1>
     <div class="winner-stamp"><span id="winner-name">—</span></div>
     <p class="winner-sub" id="winner-sub"></p>
-    <div id="comp-score-badge" style="display:none;margin:10px 0">
-      <span id="comp-score-badge-txt" style="background:#e88600;color:white;font-family:'Bangers',cursive;font-size:15px;letter-spacing:2px;padding:7px 18px;border-radius:4px;display:inline-block;box-shadow:0 3px 0 #7a4800">
-        ⏳ SCORE PENDING AI VALIDATION
-      </span>
-    </div>
     <div class="emoji-row">🎉 🎊 ⭐ 🌟 🎈</div>
 
     <div class="cork final-cork">
@@ -1819,31 +1810,9 @@ function connect() {
     if (sub)   sub.textContent = `Need ${minPlayers}+ players to start the timer`;
     toast('⚠ A player left — timer paused');
   });
-  s.on('ai:scoring', () => {
-    // AI scoring is now batched in background — no blocking overlay
-  });
   s.on('round:end', d => {
     hideAIOverlay();
     show('scoring'); renderScoring(d);
-  });
-  s.on('scores:patched', ({ scores }) => {
-    // Flip the in-round provisional notice
-    const notice = document.getElementById('ai-pending-notice');
-    if (notice && notice.style.display !== 'none') {
-      notice.innerHTML = '✅ Scores confirmed by AI';
-      notice.style.background = 'rgba(0,196,79,.12)';
-      notice.style.borderColor = 'var(--g)';
-      notice.style.color = '#007a30';
-      setTimeout(() => { notice.style.display = 'none'; }, 4000);
-    }
-    // Flip the game-over badge to confirmed
-    const badge = document.getElementById('comp-score-badge-txt');
-    if (badge) {
-      badge.textContent = '🌐 SCORE ON GLOBAL LEADERBOARD';
-      badge.style.background = 'var(--b)';
-      badge.style.boxShadow = '0 3px 0 #0a1a9a';
-    }
-    toast('✅ AI validated your score — it\'s on the leaderboard!');
   });
   s.on('room:left', () => {
     S.code = null; S.isHost = false; S.isCompetitive = false;
@@ -2138,15 +2107,12 @@ function buildScoreTable(scores) {
   }).join('');
 }
 
-function renderScoring({scores,leaderboard,round,maxRounds,isLastRound,aiScored,compBonus}) {
+function renderScoring({scores,leaderboard,round,maxRounds,isLastRound,compBonus}) {
   _currentScores = scores;
   document.getElementById('sc-meta').textContent=`Letter ${S.letter} — Round ${round}/${maxRounds}`;
   document.getElementById('sc-tbody').innerHTML=buildScoreTable(scores);
   renderLB('sc-lb',leaderboard);
   if (isLastRound) { document.getElementById('auto-bar').style.display='none'; }
-  // Show provisional notice for competitive matches
-  const notice = document.getElementById('ai-pending-notice');
-  if (notice) notice.style.display = (S.isCompetitive && aiScored === false) ? 'block' : 'none';
   // Show competition bonus toast on last round
   if (isLastRound && compBonus > 0) {
     const n = leaderboard.length;
@@ -2173,7 +2139,6 @@ function renderGameOver(lb) {
   document.getElementById('winner-sub').textContent=isMe?`${winner.score} points — you absolutely crushed it!`:`${esc(winner.name)} dominates with ${winner.score} points`;
   renderLB('final-lb',lb);
   document.getElementById('btn-again').style.display=S.isHost?'inline-block':'none';
-  document.getElementById('comp-score-badge').style.display = S.isCompetitive ? 'block' : 'none';
 }
 function playAgain() { S.socket.emit('room:restart',{code:S.code}); }
 
