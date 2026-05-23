@@ -730,16 +730,32 @@
   .field.country-valid { border-color:var(--g); }
   .field.country-err   { border-color:var(--r); }
 
+  /* ── LOADING SCREEN ────────────────────────────────────── */
+  #screen-loading { background:var(--paper); }
+  .load-logo { display:flex; justify-content:center; gap:6px; margin-bottom:18px; }
+  .load-l { font-family:'Bangers',cursive; font-size:36px; width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:8px; color:white; }
+  .load-l-n { background:var(--r); } .load-l-p { background:var(--b); } .load-l-a { background:var(--g); } .load-l-t { background:var(--o); }
+  .load-spin { font-size:32px; animation:spin 1.4s linear infinite; display:inline-block; }
+  .load-txt { font-family:'Bangers',cursive; font-size:20px; letter-spacing:3px; color:#bbb; margin-top:8px; }
+
   /* ── AUTH SCREEN ──────────────────────────────────────── */
-  .auth-card { max-width:420px; width:100%; padding:28px 24px 36px; box-shadow:0 6px 28px rgba(0,0,0,.1); }
-  .auth-title { font-family:'Bangers',cursive; font-size:26px; letter-spacing:3px; color:var(--ink); text-align:center; margin-bottom:4px; }
-  .auth-sub { font-family:'Caveat',cursive; font-size:14px; color:#aaa; text-align:center; margin-bottom:18px; }
+  .auth-card { max-width:440px; width:100%; padding:0 0 28px; box-shadow:0 8px 36px rgba(0,0,0,.16); }
+  .auth-card.torn::before { display:none; }
+  .auth-hero { background:linear-gradient(135deg,var(--b) 0%,#4a22d4 100%); padding:28px 24px 22px; text-align:center; }
+  .auth-hero-icon { font-size:44px; display:block; margin-bottom:8px; }
+  .auth-title { font-family:'Bangers',cursive; font-size:40px; letter-spacing:5px; color:white; text-align:center; margin-bottom:2px; }
+  .auth-sub { font-family:'Caveat',cursive; font-size:17px; color:rgba(255,255,255,.9); text-align:center; letter-spacing:2px; margin-bottom:0; }
+  .auth-tagline { font-family:'Caveat',cursive; font-size:14px; color:rgba(255,255,255,.65); text-align:center; margin-top:5px; }
+  .auth-body { padding:22px 24px 0; }
   .auth-tabs { display:flex; border:3px solid var(--b); border-radius:4px; overflow:hidden; margin-bottom:18px; }
-  .auth-tab { flex:1; font-family:'Bangers',cursive; font-size:17px; letter-spacing:1px; padding:9px; border:none; cursor:pointer; background:white; color:var(--b); transition:background .15s; }
+  .auth-tab { flex:1; font-family:'Bangers',cursive; font-size:19px; letter-spacing:1px; padding:10px; border:none; cursor:pointer; background:white; color:var(--b); transition:background .15s; }
   .auth-tab.active { background:var(--b); color:white; }
-  .auth-form-row { margin-bottom:12px; }
-  .auth-form-row .lbl { margin-bottom:4px; }
-  .auth-hint { font-family:'Caveat',cursive; font-size:12px; color:#aaa; text-align:center; margin-top:10px; }
+  .auth-form-row { margin-bottom:14px; }
+  .auth-form-row .lbl { margin-bottom:5px; font-size:14px; }
+  .auth-hint { font-family:'Caveat',cursive; font-size:13px; color:#aaa; text-align:center; margin-top:10px; }
+
+  /* ── EDIT PROFILE BUTTON ────────────────────────────────── */
+  .mb-edit { background:#f0f4ff; color:var(--b); box-shadow:0 4px 0 #c0cef5; border:2px solid #c0cef5; clip-path:none; }
 
   /* ── LEAVE BUTTON ─────────────────────────────────────── */
   .btn-leave {
@@ -838,13 +854,28 @@
   </svg>
 </div>
 
+<!-- ── LOADING ──────────────────────────────────────────────── -->
+<div class="screen active" id="screen-loading">
+  <div style="text-align:center">
+    <div class="load-logo">
+      <div class="load-l load-l-n">N</div>
+      <div class="load-l load-l-p">P</div>
+      <div class="load-l load-l-a">A</div>
+      <div class="load-l load-l-t">T</div>
+    </div>
+    <div style="margin:18px 0 10px;font-size:38px;animation:spin 1.4s linear infinite;display:inline-block">✈️</div>
+    <div class="load-txt">Getting things ready...</div>
+    <div style="font-family:'Caveat',cursive;font-size:15px;color:#ccc;margin-top:6px">Checking your session</div>
+  </div>
+</div>
+
 <!-- ── PROFILE ──────────────────────────────────────────────── -->
 <div class="screen" id="screen-profile">
-  <a href="index.html" class="back">← Home</a>
+  <a href="index.html" class="back" id="profile-back-btn">← Home</a>
   <div class="torn profile-card">
     <div class="profile-header">
-      <div class="profile-title">YOUR PROFILE</div>
-      <div class="profile-sub">Choose your character &amp; set your name</div>
+      <div class="profile-title" id="profile-title-text">YOUR PROFILE</div>
+      <div class="profile-sub" id="profile-sub-text">Choose your character &amp; set your name</div>
     </div>
 
     <!-- Avatar Carousel -->
@@ -876,13 +907,14 @@
       </div>
     </div>
 
-    <button class="btn-red" style="width:100%;font-size:20px;margin-top:20px" onclick="continueToMenu()">LET'S PLAY →</button>
+    <button class="btn-red" id="profile-submit-btn" style="width:100%;font-size:20px;margin-top:20px" onclick="continueToMenu()">LET'S PLAY →</button>
     <p class="err" id="profile-err"></p>
   </div>
 </div>
 
 <!-- ── MENU ────────────────────────────────────────────────── -->
 <div class="screen" id="screen-menu">
+  <a href="index.html" class="back" id="menu-home-btn">← Home</a>
   <div class="torn menu-card">
     <div class="menu-header">
       <div class="menu-av-big" id="menu-av-big">🦁</div>
@@ -904,52 +936,63 @@
     <button class="menu-btn mb-code" onclick="openCodeJoin()">
       <span class="mb-ico">🔑</span> JOIN WITH CODE
     </button>
+    <button class="menu-btn mb-edit" onclick="editProfile()" style="margin-top:4px">
+      <span class="mb-ico">✏️</span> EDIT PROFILE
+    </button>
     <p class="err" id="join-err"></p>
   </div>
 </div>
 
 <!-- ── AUTH ─────────────────────────────────────────────────── -->
-<div class="screen active" id="screen-auth">
+<div class="screen" id="screen-auth">
   <a href="index.html" class="back">← Home</a>
   <div class="torn auth-card">
-    <div class="auth-title">N·P·A·T</div>
-    <div class="auth-sub">Sign in to play — your scores, your rank</div>
-    <div class="auth-tabs">
-      <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Log In</button>
-      <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+    <!-- Colourful hero banner -->
+    <div class="auth-hero">
+      <span class="auth-hero-icon">✏️</span>
+      <div class="auth-title">N·P·A·T</div>
+      <div class="auth-sub">Name · Place · Animal · Thing</div>
+      <div class="auth-tagline">Sign in to track scores &amp; climb the global leaderboard</div>
     </div>
 
-    <!-- Login form -->
-    <div id="auth-login-form">
-      <div class="auth-form-row">
-        <label class="lbl">Email</label>
-        <input class="field" id="li-email" type="email" placeholder="you@example.com" autocomplete="email">
+    <div class="auth-body">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Log In</button>
+        <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
       </div>
-      <div class="auth-form-row">
-        <label class="lbl">Password</label>
-        <input class="field" id="li-password" type="password" placeholder="••••••••" autocomplete="current-password">
-      </div>
-      <button class="btn-blue" style="width:100%;font-size:19px;margin-top:6px" onclick="doLogin()">LOG IN →</button>
-    </div>
 
-    <!-- Signup form -->
-    <div id="auth-signup-form" style="display:none">
-      <div class="auth-form-row">
-        <label class="lbl">Email</label>
-        <input class="field" id="su-email" type="email" placeholder="you@example.com" autocomplete="email">
+      <!-- Login form -->
+      <div id="auth-login-form">
+        <div class="auth-form-row">
+          <label class="lbl">Email</label>
+          <input class="field" id="li-email" type="email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="auth-form-row">
+          <label class="lbl">Password</label>
+          <input class="field" id="li-password" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="btn-blue" id="btn-login" style="width:100%;font-size:20px;margin-top:8px" onclick="doLogin()">LOG IN →</button>
       </div>
-      <div class="auth-form-row">
-        <label class="lbl">Password <span style="font-size:11px;opacity:.6">(min 6 chars)</span></label>
-        <input class="field" id="su-password" type="password" placeholder="••••••••" autocomplete="new-password">
-      </div>
-      <div class="auth-form-row">
-        <label class="lbl">Confirm Password</label>
-        <input class="field" id="su-confirm" type="password" placeholder="••••••••" autocomplete="new-password">
-      </div>
-      <button class="btn-blue" style="width:100%;font-size:19px;margin-top:6px" onclick="doSignup()">CREATE ACCOUNT →</button>
-    </div>
 
-    <p class="err" id="auth-err" style="margin-top:10px"></p>
+      <!-- Signup form -->
+      <div id="auth-signup-form" style="display:none">
+        <div class="auth-form-row">
+          <label class="lbl">Email</label>
+          <input class="field" id="su-email" type="email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="auth-form-row">
+          <label class="lbl">Password <span style="font-size:12px;opacity:.6">(min 6 chars)</span></label>
+          <input class="field" id="su-password" type="password" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <div class="auth-form-row">
+          <label class="lbl">Confirm Password</label>
+          <input class="field" id="su-confirm" type="password" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <button class="btn-blue" id="btn-signup" style="width:100%;font-size:20px;margin-top:8px" onclick="doSignup()">CREATE ACCOUNT →</button>
+      </div>
+
+      <p class="err" id="auth-err" style="margin-top:10px"></p>
+    </div>
   </div>
 </div>
 
@@ -1323,11 +1366,14 @@ let _supabase = null;
 let _authSession = null;
 
 async function initSupabase() {
+  const _t0 = Date.now();
+  const _minLoad = ms => new Promise(r => setTimeout(r, Math.max(0, ms - (Date.now() - _t0))));
   try {
     const res = await fetch('/api/config');
     const cfg = await res.json();
     if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
-      show('profile'); // no auth configured — go straight to profile
+      await _minLoad(1000);
+      show('profile');
       return;
     }
     _supabase = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
@@ -1335,11 +1381,13 @@ async function initSupabase() {
     _authSession = session;
     _supabase.auth.onAuthStateChange((_, sess) => { _authSession = sess; });
 
+    await _minLoad(1000); // loading screen shows for at least 1 s
     if (_authSession) {
-      await loadAndPrefillProfile(); // returning user — pre-fill and go to profile
+      await loadAndPrefillProfile();
+    } else {
+      show('auth');
     }
-    // else: auth screen stays visible (it's the default active screen)
-  } catch(e) { show('profile'); }
+  } catch(e) { await _minLoad(1000); show('auth'); }
 }
 
 function _showLogoutBtns() {
@@ -1478,6 +1526,9 @@ function continueToMenu() {
           .then(() => {}, () => {});
       }
     } catch(_) {}
+    if (_editingProfile) toast('✅ Profile updated!');
+    _editingProfile = false;
+    _resetProfileUI();
     show('menu');
   } catch(e) {
     console.error('continueToMenu error:', e);
@@ -1550,11 +1601,13 @@ async function doLogin() {
   const email = document.getElementById('li-email').value.trim();
   const pass  = document.getElementById('li-password').value;
   if (!email || !pass) { document.getElementById('auth-err').textContent = 'Enter email and password'; return; }
-  document.getElementById('auth-err').textContent = 'Signing in...';
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  document.getElementById('auth-err').textContent = '';
   const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'LOG IN →';
   if (error) { document.getElementById('auth-err').textContent = error.message; return; }
   _authSession = data.session;
-  document.getElementById('auth-err').textContent = '';
   toast('✅ Signed in!');
   await loadAndPrefillProfile();
 }
@@ -1567,16 +1620,25 @@ async function doSignup() {
   if (!email || !pass) { document.getElementById('auth-err').textContent = 'Enter email and password'; return; }
   if (pass !== confirm) { document.getElementById('auth-err').textContent = 'Passwords do not match'; return; }
   if (pass.length < 6)  { document.getElementById('auth-err').textContent = 'Password must be at least 6 characters'; return; }
-  document.getElementById('auth-err').textContent = 'Creating account...';
+  const btn = document.getElementById('btn-signup');
+  btn.disabled = true; btn.textContent = 'Creating account...';
+  document.getElementById('auth-err').textContent = '';
   const { data, error } = await _supabase.auth.signUp({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'CREATE ACCOUNT →';
   if (error) { document.getElementById('auth-err').textContent = error.message; return; }
   _authSession = data.session;
-  document.getElementById('auth-err').textContent = '';
   _showLogoutBtns();
   toast('✅ Account created! Set up your profile.');
   show('profile'); // new user — always go to profile first
 }
 
+function promptLogout() {
+  document.getElementById('ov-logout').classList.add('show');
+}
+async function confirmLogout() {
+  document.getElementById('ov-logout').classList.remove('show');
+  await doLogout();
+}
 async function doLogout() {
   if (_supabase) await _supabase.auth.signOut().catch(() => {});
   _authSession = null;
@@ -1587,6 +1649,30 @@ async function doLogout() {
   document.getElementById('inp-country').classList.remove('country-valid');
   const _lb = document.getElementById('btn-logout'); if (_lb) _lb.style.display = 'none';
   show('auth');
+}
+
+// ── Edit profile ──────────────────────────────────────────────
+let _editingProfile = false;
+function editProfile() {
+  _editingProfile = true;
+  document.getElementById('inp-name').value    = S.myName    || '';
+  document.getElementById('inp-country').value = S.myCountry || '';
+  if (S.myCountry) { _countryValid = true; document.getElementById('inp-country').classList.add('country-valid'); }
+  const idx = CHARS.findIndex(c => c.emoji === S.myAvatar);
+  if (idx >= 0) { _avIdx = idx; renderAvCarousel(); }
+  document.getElementById('profile-title-text').textContent = 'EDIT PROFILE';
+  document.getElementById('profile-sub-text').textContent   = 'Update your character & display name';
+  document.getElementById('profile-submit-btn').textContent = 'SAVE CHANGES ✓';
+  const pb = document.getElementById('profile-back-btn');
+  if (pb) { pb.href = '#'; pb.onclick = e => { e.preventDefault(); _editingProfile=false; _resetProfileUI(); show('menu'); }; pb.textContent = '← Back'; }
+  show('profile');
+}
+function _resetProfileUI() {
+  document.getElementById('profile-title-text').textContent = 'YOUR PROFILE';
+  document.getElementById('profile-sub-text').textContent   = 'Choose your character & set your name';
+  document.getElementById('profile-submit-btn').textContent = "LET'S PLAY →";
+  const pb = document.getElementById('profile-back-btn');
+  if (pb) { pb.href = 'index.html'; pb.onclick = null; pb.textContent = '← Home'; }
 }
 
 function socket_competitiveJoinDirect() {
@@ -1717,7 +1803,7 @@ function connect() {
   s.on('player:joined', d => { renderLobby(d); toast(d.name+' joined! 👋'); });
   s.on('player:left',   d => { renderLobby(d); toast(d.name+' left.'); });
   s.on('host:changed',  d => {
-    S.isHost = d.newHost===s.id;
+    S.isHost = S.isCompetitive ? false : (d.newHost===s.id);
     toast(S.isHost?'You are now the host!':d.newHostName+' is the new host.');
     renderLobby({ host:d.newHost, players:[], maxRounds:0, roundTime:30, isPublic:true, maxPlayers:8, ...d });
   });
@@ -1777,6 +1863,7 @@ function connect() {
   s.on('auto:tick',    ({seconds}) => tickAutoBar(seconds));
   s.on('game:over',    d => {
     hideAIOverlay();
+    if (d.reason === 'opponent_left') toast('⚠ All opponents left — you win by default!', 4000);
     show('gameover'); renderGameOver(d.leaderboard); launchConfetti(d.leaderboard);
   });
   s.on('room:restarted', d => { S.isHost=d.host===s.id; show('lobby'); renderLobby(d); stopConfetti(); });
@@ -1979,7 +2066,7 @@ function startAutoBar(secs) {
   bar.style.display='flex'; prog.style.transition='none';
   prog.style.width=(secs/AUTO_TOTAL*100)+'%';
   document.getElementById('auto-count').textContent=secs;
-  document.getElementById('btn-next').style.display=S.isHost?'inline-block':'none';
+  document.getElementById('btn-next').style.display=(S.isHost && !S.isCompetitive)?'inline-block':'none';
 }
 function tickAutoBar(secs) {
   document.getElementById('auto-count').textContent=secs;
@@ -2138,7 +2225,7 @@ function renderGameOver(lb) {
   document.getElementById('winner-name').innerHTML=isMe?`<span class="winner-you">YOU WIN! 🎉</span>`:`${esc(winner.name)} Wins!`;
   document.getElementById('winner-sub').textContent=isMe?`${winner.score} points — you absolutely crushed it!`:`${esc(winner.name)} dominates with ${winner.score} points`;
   renderLB('final-lb',lb);
-  document.getElementById('btn-again').style.display=S.isHost?'inline-block':'none';
+  document.getElementById('btn-again').style.display=(S.isHost && !S.isCompetitive)?'inline-block':'none';
 }
 function playAgain() { S.socket.emit('room:restart',{code:S.code}); }
 
@@ -2345,6 +2432,18 @@ new MutationObserver(() => document.querySelectorAll(PRESS_SEL).forEach(bindPres
 </div>
 
 <!-- Global logout button — fixed top-right, visible on all screens when logged in -->
-<button id="btn-logout" onclick="doLogout()" style="display:none;position:fixed;top:16px;right:16px;font-family:'Bangers',cursive;font-size:15px;letter-spacing:1px;color:white;background:var(--r);padding:7px 14px;border-radius:4px;border:2px solid rgba(0,0,0,.15);box-shadow:2px 3px 0 #8b0000;transform:rotate(1.5deg);cursor:pointer;transition:transform .15s,box-shadow .15s;z-index:200;">Log out ✕</button>
+<!-- LOGOUT CONFIRM OVERLAY -->
+<div class="overlay" id="ov-logout">
+  <div class="ov-box">
+    <div class="ov-title">Log Out?</div>
+    <p class="ov-msg">Are you sure you want to sign out?</p>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="btn-red" style="flex:1;font-size:17px" onclick="confirmLogout()">LOG OUT</button>
+      <button class="btn-out" style="flex:1" onclick="document.getElementById('ov-logout').classList.remove('show')">Stay</button>
+    </div>
+  </div>
+</div>
+
+<button id="btn-logout" onclick="promptLogout()" style="display:none;position:fixed;top:16px;right:16px;font-family:'Bangers',cursive;font-size:15px;letter-spacing:1px;color:white;background:var(--r);padding:7px 14px;border-radius:4px;border:2px solid rgba(0,0,0,.15);box-shadow:2px 3px 0 #8b0000;transform:rotate(1.5deg);cursor:pointer;transition:transform .15s,box-shadow .15s;z-index:200;">Log out ✕</button>
 </body>
 </html>

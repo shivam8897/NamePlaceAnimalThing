@@ -34,13 +34,13 @@ const DEFAULT_ROUNDS     = 10;
 const DEFAULT_MAX        = 8;
 const AUTO_ADVANCE       = 30;
 const TIMER_OPTIONS      = [10, 20, 30, 60];
-const ROUND_OPTIONS      = [3, 5, 10];
+const ROUND_OPTIONS      = [3, 4, 5, 10];
 
 const COMP_ROUNDS      = 5;
 const COMP_MIN_PLAYERS = 2;    // minimum to start the lobby timer
 const COMP_PLAYERS     = 8;    // maximum / instant-start
 const COMP_WAIT_TIME   = 60;   // seconds after 2+ players join before auto-start
-const COMP_AUTO_ADV    = 20;
+const COMP_AUTO_ADV    = 15;
 const COMP_VOTE_DURATION = 30; // eval voting time for competitive mode
 const COMP_DAILY_LIMIT = 5;    // competitive matches per player per day
 const COMP_BONUS       = { 2:5, 3:10, 4:15, 5:20, 6:30, 7:40, 8:50 };
@@ -563,6 +563,18 @@ async function handlePlayerLeave(socket, room, code) {
 
   io.to(code).emit('player:left', { id: socket.id, name, ...publicRoom(room) });
 
+  // If only 1 player remains during an active game, end it immediately
+  if (room.players.size === 1 && ['playing','evaluating','scoring'].includes(room.state)) {
+    clearInterval(room.timer);
+    clearInterval(room.autoTimer);
+    clearInterval(room.evalTimer);
+    room.state = 'gameover';
+    const lb = leaderboard(room);
+    if (room.isCompetitive) saveCompetitiveScores(room, lb);
+    io.to(code).emit('game:over', { leaderboard: lb, reason: 'opponent_left' });
+    return;
+  }
+
   if (room.state === 'playing' && !room.submissions.has(socket.id)) {
     room.submissions.set(socket.id, { name:'', place:'', animal:'', thing:'', submittedAt: Date.now() });
     room.submissionOrder.push(socket.id);
@@ -615,7 +627,7 @@ io.on('connection', (socket) => {
     if (!name) return socket.emit('err', 'Name is required');
     const best = findBestPublicRoom();
     if (!best) {
-      const room = makeRoom(socket.id, name, avatar || '🦁', { isPublic: true });
+      const room = makeRoom(socket.id, name, avatar || '🦁', { isPublic: true, rounds: 4, timer: 30 });
       socket.join(room.code);
       socket.emit('room:joined', { isHost: true, quickJoinCreated: true, ...publicRoom(room) });
       io.emit('rooms:updated');
@@ -825,11 +837,33 @@ app.get('/api/leaderboard', async (req, res) => {
   if (!supabase) return res.json([]);
   try {
     const country = (req.query.country || '').trim();
-    let query = supabase.from('leaderboard').select('*').order('rank').limit(50);
-    if (country) query = query.ilike('country', `%${country}%`);
-    const { data, error } = await query;
-    if (error) throw error;
-    res.json(data || []);
+    const period  = req.query.period || 'alltime';
+
+    if (period === 'today') {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from('match_results')
+        .select('player_id, score, players(username, country)')
+        .gte('played_at', `${today}T00:00:00Z`);
+      if (error) throw error;
+      const agg = {};
+      for (const row of (data || [])) {
+        const pid = row.player_id;
+        if (!pid) continue;
+        if (!agg[pid]) agg[pid] = { player_id: pid, username: row.players?.username || '?', country: row.players?.country || '', total_score: 0, match_count: 0 };
+        agg[pid].total_score += (row.score || 0);
+        agg[pid].match_count++;
+      }
+      let lb = Object.values(agg).sort((a, b) => b.total_score - a.total_score).slice(0, 50);
+      if (country) lb = lb.filter(e => (e.country || '').toLowerCase().includes(country.toLowerCase()));
+      res.json(lb.map((e, i) => ({ ...e, rank: i + 1, score: e.total_score })));
+    } else {
+      let query = supabase.from('leaderboard').select('*').order('rank').limit(50);
+      if (country) query = query.ilike('country', `%${country}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      res.json(data || []);
+    }
   } catch (e) {
     console.error('[Supabase] leaderboard error:', e.message);
     res.status(500).json({ error: 'Could not load leaderboard' });

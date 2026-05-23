@@ -559,7 +559,7 @@
 </section>
 
 <!-- FUNNY WORDS OF THE DAY -->
-<section class="fw-section" id="funny-words">
+<section class="fw-section" id="funny-words" style="display:none">
   <div class="page-wrap">
     <p class="section-label">— Players Said What?! —</p>
     <h2 class="section-title reveal">😂 Today's <span class="highlight">Funniest Answers</span></h2>
@@ -584,9 +584,14 @@
       <div class="lb-head">
         <div>
           <div class="lb-head-title">🏆 TOP PLAYERS WORLDWIDE</div>
-          <div class="lb-head-sub">Auto-refreshes every 5 seconds</div>
+          <div class="lb-head-sub" id="lb-refresh-note">Auto-refreshes every 5 seconds</div>
         </div>
         <input class="lb-filter-inp" id="lb-filter" type="text" placeholder="🌍 Filter by country..." maxlength="30">
+      </div>
+      <!-- Period tabs -->
+      <div style="display:flex;border-bottom:2px solid rgba(255,255,255,.15);margin-bottom:6px;">
+        <button id="lb-tab-alltime" onclick="setLbPeriod('alltime')" style="flex:1;font-family:'Bangers',cursive;font-size:16px;letter-spacing:2px;padding:10px;border:none;cursor:pointer;background:rgba(255,255,255,.18);color:white;border-bottom:3px solid #FFD700;transition:background .15s;">ALL TIME</button>
+        <button id="lb-tab-today"   onclick="setLbPeriod('today')"   style="flex:1;font-family:'Bangers',cursive;font-size:16px;letter-spacing:2px;padding:10px;border:none;cursor:pointer;background:transparent;color:rgba(255,255,255,.6);border-bottom:3px solid transparent;transition:background .15s;">TODAY</button>
       </div>
       <div id="lb-body"><div class="lb-spinner">Loading leaderboard...</div></div>
     </div>
@@ -692,9 +697,22 @@
   }
   function esc(s){ return (s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
 
-  let _lbAll = [], _lbFilter = '';
+  let _lbAll = [], _lbFilter = '', _lbPeriod = 'alltime';
   const MEDALS = ['🥇','🥈','🥉'];
   const ROW_CLS = ['r1','r2','r3'];
+
+  function setLbPeriod(p) {
+    _lbPeriod = p;
+    document.getElementById('lb-tab-alltime').style.background = p==='alltime'?'rgba(255,255,255,.18)':'transparent';
+    document.getElementById('lb-tab-alltime').style.color = p==='alltime'?'white':'rgba(255,255,255,.6)';
+    document.getElementById('lb-tab-alltime').style.borderBottomColor = p==='alltime'?'#FFD700':'transparent';
+    document.getElementById('lb-tab-today').style.background = p==='today'?'rgba(255,255,255,.18)':'transparent';
+    document.getElementById('lb-tab-today').style.color = p==='today'?'white':'rgba(255,255,255,.6)';
+    document.getElementById('lb-tab-today').style.borderBottomColor = p==='today'?'#FFD700':'transparent';
+    const note = document.getElementById('lb-refresh-note');
+    if (note) note.textContent = p==='today'?'Today\'s scores · auto-refreshes':'All-time scores · auto-refreshes';
+    loadLB();
+  }
 
   function renderLB() {
     const body = document.getElementById('lb-body');
@@ -702,27 +720,27 @@
       ? _lbAll.filter(p=>(p.country||'').toLowerCase().includes(_lbFilter.toLowerCase()))
       : _lbAll;
     if (!data.length) {
-      body.innerHTML = `<div class="lb-empty-state"><div class="lb-empty-ico">${_lbFilter?'🔍':'🎮'}</div><div class="lb-empty-txt">${_lbFilter?'No players from this country yet':'No competitive matches yet — be the first!'}</div></div>`;
+      body.innerHTML = `<div class="lb-empty-state"><div class="lb-empty-ico">${_lbFilter?'🔍':'🎮'}</div><div class="lb-empty-txt">${_lbFilter?'No players from this country yet':(_lbPeriod==='today'?'No competitive matches today yet!':'No competitive matches yet — be the first!')}</div></div>`;
       return;
     }
     body.innerHTML = data.map((p,i)=>`
       <div class="lb-row ${i<3?ROW_CLS[i]:''}">
-        <div class="lb-medal">${i<3?MEDALS[i]:`#${p.rank}`}</div>
+        <div class="lb-medal">${i<3?MEDALS[i]:`#${p.rank||i+1}`}</div>
         <div class="lb-flag">${flag(p.country)}</div>
         <div class="lb-info">
           <div class="lb-uname">${esc(p.username)}</div>
           ${p.country?`<div class="lb-ctry">${esc(p.country)}</div>`:''}
         </div>
         <div class="lb-right">
-          <div class="lb-pts">${Number(p.total_score).toLocaleString()} <span style="font-size:14px;font-family:'Comic Neue',cursive;letter-spacing:0">pts</span></div>
-          <div class="lb-meta">${p.matches} match${p.matches===1?'':'es'} · best ${p.best_score}</div>
+          <div class="lb-pts">${Number(p.total_score||p.score||0).toLocaleString()} <span style="font-size:14px;font-family:'Comic Neue',cursive;letter-spacing:0">pts</span></div>
+          <div class="lb-meta">${_lbPeriod==='today'?(p.match_count||1)+' match'+(p.match_count===1?'':'es')+' today':((p.matches||0)+' match'+(p.matches===1?'':'es')+' · best '+(p.best_score||0))}</div>
         </div>
       </div>`).join('');
   }
 
   async function loadLB() {
     try {
-      const r = await fetch('/api/leaderboard');
+      const r = await fetch(`/api/leaderboard?period=${_lbPeriod}`);
       if (!r.ok) throw new Error(r.status);
       _lbAll = await r.json();
       renderLB();
